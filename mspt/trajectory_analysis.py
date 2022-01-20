@@ -55,24 +55,44 @@ def get_csv_files(directory):
     return list_of_csv
 
 
-def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=(os.cpu_count()-1) ):
-    """Analyze trajectories.
+def fit_trajectories_sync(list_of_csv,
+                          output_file,
+                          frame_rate=199.8,
+                          pixel_size=84.4,
+                          parallel=True,
+                          processes=(os.cpu_count()-1) ):
+    '''
+    
 
-    Keyword arguments:
-    list_of_csv -- the real part (default 0.0)
-    output_file -- the imaginary part (default 0.0)
-    """
-    if output_file:
+    Parameters
+    ----------
+    list_of_csv : list
+        DESCRIPTION.
+    output_file : HDF5 store
+        DESCRIPTION.
+    frame_rate : float, optional
+        DESCRIPTION. The default is 199.8.
+    pixel_size : float, optional
+        DESCRIPTION. The default is 84.4.
+    parallel : bool, optional
+        DESCRIPTION. The default is True.
+    processes : int, optional
+        DESCRIPTION. The default is (os.cpu_count()-1).
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    if os.path.exists(output_file):
         counter = 2
         filename, extension = os.path.splitext(output_file)
         while os.path.exists(output_file):
             output_file = filename + "_" + str(counter) + extension
             counter += 1
             
-        dfs_store = pd.HDFStore(output_file)
-    else:
-        dfs_store = pd.HDFStore(output_file)
-
+    dfs_store = pd.HDFStore(output_file)
     
     if parallel:
         with tqdm(total=len(list_of_csv), desc='Analyzing trajectories...', unit=' csv files') as pbar:
@@ -107,55 +127,81 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
     return print('Saved trajectory analysis results to: {}'.format(output_file))
 
 
-def fit_trajectories_all_files_async(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=(os.cpu_count()-1) ):
-    """Analyze trajectories.
+def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=(os.cpu_count()-1) ):
+    '''
+    
 
-    Keyword arguments:
-    list_of_csv -- the real part (default 0.0)
-    output_file -- the imaginary part (default 0.0)
-    """
-    if output_file:
+    Parameters
+    ----------
+    list_of_csv : list
+        DESCRIPTION.
+    output_file : HDF5 store
+        DESCRIPTION.
+    frame_rate : float, optional
+        DESCRIPTION. The default is 199.8.
+    pixel_size : float, optional
+        DESCRIPTION. The default is 84.4.
+    parallel : bool, optional
+        DESCRIPTION. The default is True.
+    processes : int, optional
+        DESCRIPTION. The default is (os.cpu_count()-1).
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    if os.path.exists(output_file):
         counter = 2
         filename, extension = os.path.splitext(output_file)
         while os.path.exists(output_file):
             output_file = filename + "_" + str(counter) + extension
             counter += 1
-            
-        dfs_store = pd.HDFStore(output_file)
-    else:
-        dfs_store = pd.HDFStore(output_file)
 
-    
-    if parallel:
-        with tqdm(total=len(list_of_csv), desc='Analyzing trajectories...', unit=' csv files') as pbar:
-            with multiprocessing.Pool(processes=processes) as pool:
 
-                results_object = pool.starmap_async(diff.fit_JDD_MSD, zip(list_of_csv,repeat(frame_rate),repeat(pixel_size)),chunksize=1)
-                remaining = len(list_of_csv)
-                while not results_object.ready():
-                    remaining_now = results_object._number_left
-                    if remaining_now != remaining:
-                        pbar.update(remaining-remaining_now)
-                    remaining = remaining_now
-                    time.sleep(0.1)
-                result = results_object.get()
-                
-            if pbar.n < 100:
-                pbar.update(100-pbar.n)
-  
-        for i, res in enumerate(result):
-            dfs_store[list_of_csv[i]] = res
+    pool = mp.Pool(processes)
+
+    for csv_idx, csv_file in enumerate(list_of_csv):
+        traj_data = pd.read_csv(csv_file, usecols=['frame',
+                                                     'contrast',
+                                                     'x',
+                                                     'y',
+                                                     'sigma x',
+                                                     'sigma y',
+                                                     'particle'])
+
+        particle_id = traj_data['particle'].unique()
     
-        pool.close()
-        pool.join()
+        useful_chunk_size = len(particle_id) // (processes*10)
+        number_of_chunks = len(particle_id) // useful_chunk_size
+        
+        particle_ids_split = np.array_split(particle_id, number_of_chunks)
     
-    else:
-        with tqdm(total=len(list_of_csv), desc='Analyzing trajectories...', unit=' csv files') as pbar:
-            for filename in list_of_csv:
-                dfs_store[filename] = diff.do_work(filename)
-                pbar.update(1)
-                
-    dfs_store.close()
+        pbar = tqdm(total=number_of_chunks, desc='Fitting trajectories...', unit='trajectory chunks')
+
+        
+        result_objects = [pool.apply_async(diff.fit_JDD_MSD,
+                                           args=(chunk,
+                                                 traj_data,
+                                                 frame_rate,
+                                                 pixel_size),
+                                                 callback=lambda _: pbar.update(1)) for chunk in particle_ids_split]
+    
+        fits_list = list()
+        for i in range(len(result_objects)):
+            fits_list.append(result_objects[i].get())
+    
+        df_JDD_MSD = pd.concat(fits_list,axis=0) 
+        
+        with pd.HDFStore(output_file) as hdf_store:
+            hdf_store[csv_file] = df_JDD_MSD
+        
+        print('Saved trajectory analysis results of file {} ({}/{}) to HDF5'.format(csv_file, str(csv_idx+1), str(len(list_of_csv))))
+    
+    
+    pool.close()
+    pool.join()
     return print('Saved trajectory analysis results to: {}'.format(output_file))
 
 
