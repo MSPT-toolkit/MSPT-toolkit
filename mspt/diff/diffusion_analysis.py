@@ -7,24 +7,13 @@ from mspt.diff.diffusion_analysis_functions import fit_jdd_cumul_off, fit_jdd_cu
 from mspt.diff.diffusion_analysis_jacobians import jdd_jac, jdd_jac_2c, msd_jdd_jac, msd_jdd_jac_2c
 
 
-def fit_JDD_MSD(t_filename,frame_rate=199.8,pixel_size=84.4):
-    
-    t_lenfilt = pd.read_csv(t_filename, usecols=['frame',
-                                                 'contrast',
-                                                 'x',
-                                                 'y',
-                                                 'sigma x',
-                                                 'sigma y',
-                                                 'particle'])
-
-    
-    tr_partnums = t_lenfilt['particle'].unique()
-    
+def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4):
+        
     traj_dict = dict()
     D_jdd = dict()
     bounds_msd = [[0.0001, -np.inf],[np.inf, np.inf]]
 
-    for d, i in enumerate(tr_partnums):
+    for d, i in enumerate(trajectory_id):
         traj = t_lenfilt[t_lenfilt['particle']==i]
         ti = np.asarray(traj['frame'])
 
