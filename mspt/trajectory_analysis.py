@@ -85,49 +85,77 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
             output_file = filename + "_" + str(counter) + extension
             counter += 1
 
-
-    pool = mp.Pool(processes)
-
-    for csv_idx, csv_file in enumerate(list_of_csv):
-        traj_data = pd.read_csv(csv_file, usecols=['frame',
-                                                     'contrast',
-                                                     'x',
-                                                     'y',
-                                                     'sigma x',
-                                                     'sigma y',
-                                                     'particle'])
-
-        particle_id = traj_data['particle'].unique()
+    if parallel:
+        with mp.Pool(processes) as pool:
     
-        useful_chunk_size = len(particle_id) // (processes*10)
-        number_of_chunks = len(particle_id) // useful_chunk_size
+            
+            for csv_idx, csv_file in enumerate(list_of_csv):
+                traj_data = pd.read_csv(csv_file, usecols=['frame',
+                                                             'contrast',
+                                                             'x',
+                                                             'y',
+                                                             'sigma x',
+                                                             'sigma y',
+                                                             'particle'])
         
-        particle_ids_split = np.array_split(particle_id, number_of_chunks)
+                particle_id = traj_data['particle'].unique()
+            
+                # useful_chunk_size = particle_id.shape[0] // (processes*10)
+                # number_of_chunks = particle_id.shape[0] // useful_chunk_size
+                number_of_chunks = 100
+                
+                particle_ids_split = np.array_split(particle_id, number_of_chunks)
+            
+                with tqdm(total=particle_id.shape[0], unit='trajectories') as pbar:
+                    
+                    pbar.set_description("Fitting trajectories... file {}/{}".format(str(csv_idx+1),str(len(list_of_csv))))
+                    
+                    result_objects = [pool.apply_async(diff.fit_JDD_MSD,
+                                                       args=(chunk,
+                                                             traj_data,
+                                                             frame_rate,
+                                                             pixel_size),
+                                                             callback=lambda _: pbar.update(chunk.shape[0])) for chunk in particle_ids_split]
+                
+                    fits_list = list()
+                    for i in range(len(result_objects)):
+                        fits_list.append(result_objects[i].get())
+            
+                    if pbar.n < particle_id.shape[0]:
+                        pbar.update(particle_id.shape[0]- pbar.n)
+                        
+                        
+                df_JDD_MSD = pd.concat(fits_list,axis=0) 
+                
+                with pd.HDFStore(output_file) as hdf_store:
+                    hdf_store[csv_file] = df_JDD_MSD
+                
+                # print('Saved trajectory analysis results of file {} ({}/{}) to HDF5'.format(csv_file,
+                #                                                                             str(csv_idx+1),
+                #                                                                             str(len(list_of_csv))))
     
-        with tqdm(total=particle_id.shape[0], desc='Fitting trajectories...', unit='trajectories') as pbar:
-
-            result_objects = [pool.apply_async(diff.fit_JDD_MSD,
-                                               args=(chunk,
-                                                     traj_data,
-                                                     frame_rate,
-                                                     pixel_size),
-                                                     callback=lambda _: pbar.update(chunk.shape[0])) for chunk in particle_ids_split]
-        
-            fits_list = list()
-            for i in range(len(result_objects)):
-                fits_list.append(result_objects[i].get())
+    else:
+        for csv_idx, csv_file in enumerate(list_of_csv):
+            traj_data = pd.read_csv(csv_file, usecols=['frame',
+                                                         'contrast',
+                                                         'x',
+                                                         'y',
+                                                         'sigma x',
+                                                         'sigma y',
+                                                         'particle'])
     
+            particle_id = traj_data['particle'].unique()
+            
+            df_JDD_MSD = diff.fit_JDD_MSD(particle_id,traj_data,frame_rate,pixel_size)
     
-        df_JDD_MSD = pd.concat(fits_list,axis=0) 
-        
-        with pd.HDFStore(output_file) as hdf_store:
-            hdf_store[csv_file] = df_JDD_MSD
-        
-        print('Saved trajectory analysis results of file {} ({}/{}) to HDF5'.format(csv_file, str(csv_idx+1), str(len(list_of_csv))))
-    
-    
-    pool.close()
-    pool.join()
+            with pd.HDFStore(output_file) as hdf_store:
+                hdf_store[csv_file] = df_JDD_MSD
+            
+            # print('Saved trajectory analysis results of file {} ({}/{}) to HDF5'.format(csv_file,
+            #                                                                             str(csv_idx+1), 
+            #                                                                             str(len(list_of_csv))))
+            
+            
     return print('Saved trajectory analysis results to: {}'.format(output_file))
 
 

@@ -75,7 +75,7 @@ def fileDialog(initialdir=None):
     assert not (enterdir is None)
     path = filedialog.askopenfilename(initialdir=enterdir, multiple=False)
     _fileDialogLastDir = os.path.dirname(path)
-    get_ipython().run_line_magic("gui", "tk")
+    #get_ipython().run_line_magic("gui", "tk")
     return path
 
 
@@ -91,7 +91,7 @@ def directoryDialog(initialdir=None):
     Returns:
        path (str):: Directory path
 
-    """
+    """   
     global _directoryDialogLastDir
     # Create Tk root
     root = tk.Tk()
@@ -109,7 +109,7 @@ def directoryDialog(initialdir=None):
     assert not (enterdir is None)
     path = filedialog.askdirectory(initialdir=enterdir)
     _directoryDialogLastDir = path
-    get_ipython().run_line_magic("gui", "tk")
+    #get_ipython().run_line_magic("gui", "tk")
     return path
 
 
