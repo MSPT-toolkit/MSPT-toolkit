@@ -1,12 +1,10 @@
-import multiprocessing
+import multiprocessing as mp
 
 import numpy as np
 import os
 import glob
 import pandas as pd
 from tqdm.notebook import tqdm
-import time
-from itertools import repeat
 
 import warnings
 from tables import NaturalNameWarning
@@ -53,78 +51,6 @@ def get_csv_files(directory):
     
     list_of_csv = list(df.loc[:,'file_data'])
     return list_of_csv
-
-
-def fit_trajectories_sync(list_of_csv,
-                          output_file,
-                          frame_rate=199.8,
-                          pixel_size=84.4,
-                          parallel=True,
-                          processes=(os.cpu_count()-1) ):
-    '''
-    
-
-    Parameters
-    ----------
-    list_of_csv : list
-        DESCRIPTION.
-    output_file : HDF5 store
-        DESCRIPTION.
-    frame_rate : float, optional
-        DESCRIPTION. The default is 199.8.
-    pixel_size : float, optional
-        DESCRIPTION. The default is 84.4.
-    parallel : bool, optional
-        DESCRIPTION. The default is True.
-    processes : int, optional
-        DESCRIPTION. The default is (os.cpu_count()-1).
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-
-    '''
-    if os.path.exists(output_file):
-        counter = 2
-        filename, extension = os.path.splitext(output_file)
-        while os.path.exists(output_file):
-            output_file = filename + "_" + str(counter) + extension
-            counter += 1
-            
-    dfs_store = pd.HDFStore(output_file)
-    
-    if parallel:
-        with tqdm(total=len(list_of_csv), desc='Analyzing trajectories...', unit=' csv files') as pbar:
-            with multiprocessing.Pool(processes=processes) as pool:
-
-                results_object = pool.starmap_async(diff.do_work, zip(list_of_csv,repeat(frame_rate),repeat(pixel_size)),chunksize=1)
-                remaining = len(list_of_csv)
-                while not results_object.ready():
-                    remaining_now = results_object._number_left
-                    if remaining_now != remaining:
-                        pbar.update(remaining-remaining_now)
-                    remaining = remaining_now
-                    time.sleep(0.1)
-                result = results_object.get()
-                
-            if pbar.n < 100:
-                pbar.update(100-pbar.n)
-  
-        for i, res in enumerate(result):
-            dfs_store[list_of_csv[i]] = res
-    
-        pool.close()
-        pool.join()
-    
-    else:
-        with tqdm(total=len(list_of_csv), desc='Analyzing trajectories...', unit=' csv files') as pbar:
-            for filename in list_of_csv:
-                dfs_store[filename] = diff.do_work(filename)
-                pbar.update(1)
-                
-    dfs_store.close()
-    return print('Saved trajectory analysis results to: {}'.format(output_file))
 
 
 def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=(os.cpu_count()-1) ):
@@ -178,19 +104,19 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
         
         particle_ids_split = np.array_split(particle_id, number_of_chunks)
     
-        pbar = tqdm(total=number_of_chunks, desc='Fitting trajectories...', unit='trajectory chunks')
+        with tqdm(total=particle_id.shape[0], desc='Fitting trajectories...', unit='trajectories') as pbar:
 
+            result_objects = [pool.apply_async(diff.fit_JDD_MSD,
+                                               args=(chunk,
+                                                     traj_data,
+                                                     frame_rate,
+                                                     pixel_size),
+                                                     callback=lambda _: pbar.update(chunk.shape[0])) for chunk in particle_ids_split]
         
-        result_objects = [pool.apply_async(diff.fit_JDD_MSD,
-                                           args=(chunk,
-                                                 traj_data,
-                                                 frame_rate,
-                                                 pixel_size),
-                                                 callback=lambda _: pbar.update(1)) for chunk in particle_ids_split]
+            fits_list = list()
+            for i in range(len(result_objects)):
+                fits_list.append(result_objects[i].get())
     
-        fits_list = list()
-        for i in range(len(result_objects)):
-            fits_list.append(result_objects[i].get())
     
         df_JDD_MSD = pd.concat(fits_list,axis=0) 
         
@@ -203,6 +129,8 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
     pool.close()
     pool.join()
     return print('Saved trajectory analysis results to: {}'.format(output_file))
+
+
 
 
 def apply_calibration(df, slope=28191.37194436, offset=-20.47852753):
@@ -241,4 +169,3 @@ def calc_particle_number_linked(df):
 
 if __name__ == '__main__':
     fit_trajectories()
-    

@@ -10,6 +10,7 @@ from tqdm.notebook import tqdm
 import os
 import multiprocessing as mp
 
+
 try:
     import torch as th
     if not th.cuda.is_available():
@@ -162,6 +163,28 @@ def median_filter_frames(video_chunk, starting_frame_number, full_video, window_
     return processed_frames
 
 
+arr_dict = {}
+# Pass shared memory array information to Pool workers
+def pass_shared_arr(shared_memory_array, array_shape):
+    arr_dict['shared_memory_array'] = shared_memory_array
+    arr_dict['array_shape'] = array_shape
+    
+    
+def median_filter_frames_shared_arr(frames, window_half_size):
+    
+    full_video = np.frombuffer(arr_dict['shared_memory_array']).reshape(arr_dict['array_shape'])
+    
+    processed_frames = np.zeros((len(frames), full_video.shape[1], full_video.shape[2]))
+    starting_frame_number = frames[0]
+    
+    for frame_idx, frame in enumerate(frames):
+        if frame >= window_half_size and frame < full_video.shape[0] - window_half_size - 1:
+            processed_frames[frame_idx,:,:] = ( full_video[frame,:,:] / 
+                                                np.median(full_video[frame-window_half_size:frame+window_half_size+1,:,:], axis=0) - 1.0 )
+            
+    return starting_frame_number, processed_frames
+
+
 def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode = 'mean', parallel = 0, GPU = 0):
     # mode 'mean': continuous background removal as used for mass photometry. Generates mean images of window_half_size frames before (mean_before) and after (mean_after) the central frame and generates the new frame by calculating mean_after/mean_before.
     #mode 'median': continuous background removal using a sliding median window. Generates a median image starting at window_half_size frames before and ending window_half_size frames after the central frame and divides the central frame by this median image.
@@ -204,37 +227,45 @@ def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode =
             th.cuda.empty_cache()
         
         elif parallel == 1 and GPU == 0:
-            useful_chunk_size = len(av_frames)//(mp.cpu_count()-1)
             
-            if np.remainder(len(av_frames), useful_chunk_size) != 0:
-                number_of_chunks = (len(av_frames)//useful_chunk_size)+1
-                pbar = tqdm(total=number_of_chunks, desc='Generating frames...', unit='video chunks')
-                last_processed_chunk = median_filter_frames(av_frames[(number_of_chunks-1)*useful_chunk_size:], (number_of_chunks-1)*useful_chunk_size, av_frames, window_half_size)
-                pbar.update(1)
-                pool = mp.Pool(mp.cpu_count()-1)
-                result_objects = [pool.apply_async(median_filter_frames, args=(av_frames[chunk*useful_chunk_size:(chunk+1)*useful_chunk_size], chunk*useful_chunk_size, av_frames, window_half_size), callback=lambda _: pbar.update(1)) for chunk in range(number_of_chunks-1)]
-                processed_frames = np.zeros_like(av_frames)
-                for i in range(len(result_objects)):
-                    processed_frames[i*useful_chunk_size:(i+1)*useful_chunk_size] = result_objects[i].get()
+            useful_chunk_size = av_frames.shape[0] // ((mp.cpu_count()-1)*10)
+            number_of_chunks = av_frames.shape[0] // useful_chunk_size
+            
+            frames_split = np.array_split(np.arange(av_frames.shape[0]), number_of_chunks)
+            
+            # Get dimensions of movie data
+            movie_shape = av_frames.shape
+            # Create shared memomy array
+            shared_arr = mp.RawArray('d', movie_shape[0] * movie_shape[1] * movie_shape[2])
+            shared_arr_np = np.frombuffer(shared_arr, dtype=np.float64).reshape(movie_shape)
+            # Copy movie data to shared array.
+            np.copyto(shared_arr_np, av_frames)
+            
+            
+            with tqdm(total=av_frames.shape[0], desc='Generating frames...', unit='frames') as pbar:
                 
-                processed_frames[(number_of_chunks-1)*useful_chunk_size:] = last_processed_chunk
+                with mp.Pool(processes=(mp.cpu_count()-1), initializer=pass_shared_arr, initargs=(shared_arr, movie_shape)) as pool:
+            
+                    result_objects = [pool.apply_async(median_filter_frames_shared_arr,
+                                                       args=(chunk,
+                                                             window_half_size),
+                                                             callback=lambda _: pbar.update(chunk.shape[0])) for chunk in frames_split]
+                    
+                    processed_movie_list = list()
+                    for i in range(len(result_objects)):
+                        processed_movie_list.append(result_objects[i].get())
                 
-                pool.close()
-                pool.join()
+                # Sort movie chunks according to start frame index
+                processed_movie_list.sort(key=lambda x: x[0])
+                # Remove start index from list of lists
+                processed_movie_list = [i[1] for i in processed_movie_list]
+                # Concatenate list
+                processed_frames = np.concatenate(processed_movie_list)
                 
-            else:
-                number_of_chunks = len(av_frames)//useful_chunk_size
-                pbar = tqdm(total=number_of_chunks, desc='Generating frames...', unit='video chunks')
-                pool = mp.Pool(mp.cpu_count()-1)
-                result_objects = [pool.apply_async(median_filter_frames, args=(av_frames[chunk*useful_chunk_size:(chunk+1)*useful_chunk_size], chunk*useful_chunk_size, av_frames, window_half_size), callback=lambda _: pbar.update(1)) for chunk in range(number_of_chunks)]
-                
-                processed_frames = np.zeros_like(av_frames)
-                for i in range(len(result_objects)):
-                    processed_frames[i*useful_chunk_size:(i+1)*useful_chunk_size] = result_objects[i].get()
-                
-                pool.close()
-                pool.join()
-    
+                if pbar.n < av_frames.shape[0]:
+                    pbar.update(av_frames.shape[0] - pbar.n)
+            
+
     return processed_frames
 
 
