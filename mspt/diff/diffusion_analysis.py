@@ -14,7 +14,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4):
     bounds_msd = [[0.0001, -np.inf],[np.inf, np.inf]]
 
     for d, i in enumerate(trajectory_id):
-        traj = trajs_df[trajs_df['particle']==i]
+        traj = t_lenfilt[t_lenfilt['particle']==i]
         ti = np.asarray(traj['frame'])
 
         c = np.asarray(-traj['contrast'])
