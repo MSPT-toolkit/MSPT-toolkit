@@ -23,7 +23,7 @@ def plot_2D_KDE(data,
     As diffusion readout, one can choose between diffusion coefficients 
     determined by mean squared displacement (MSD) and jump distance
     distribution (JDD) analysis. For details, see Heermann et al.,
-    Nat Methods (2021). https://doi.org/10.1038/s41592-021-01260-x
+    Nature Methods (2021). (https://doi.org/10.1038/s41592-021-01260-x)
     
     Parameters
     ----------

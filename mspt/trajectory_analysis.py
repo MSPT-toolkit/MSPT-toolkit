@@ -17,7 +17,46 @@ import mspt.diff.diffusion_analysis as diff
 def get_csv_file_size(row):
     return os.path.getsize(row['file_data'])
 
+    '''
+    Find files with specified extension type in directory.
+    
+    Returns a list of paths to all files of the chosen extension type 
+    within a directory. Optionally feed a string to the exclude argument
+    in order to exclude files that contain this text patch.
+
+    Parameters
+    ----------
+    directory : str
+        Directory path.
+    extension : str, optional
+        File extension. The default is "mp".
+    exclude : str, optional
+        String pattern to filter files. The default is None.
+
+    Returns
+    -------
+    filepaths : list
+        List of filepaths.
+
+    '''
+    
+    
 def get_csv_files(directory):
+    '''
+    Find files with csv file extension and string pattern 'trajectories' in
+    directory.
+
+    Parameters
+    ----------
+    directory : strs
+        Directory path.
+
+    Returns
+    -------
+    list_of_csv : list
+        List of csv files in the directory and its subdirectories.
+
+    '''
     initialdir = os.path.normpath(directory)
     
     csv_files = list()
@@ -31,6 +70,7 @@ def get_csv_files(directory):
                 csv_files.append(tmp)
                 
     # if path and filename get too long (>261 characters), use this
+    # workaround in Windows
     csv_files_mod = list()
     for i in csv_files:
         if len(i[0]) >=260:
@@ -53,29 +93,34 @@ def get_csv_files(directory):
     return list_of_csv
 
 
-def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=(os.cpu_count()-1) ):
+def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=( os.cpu_count()-1 ) ):
     '''
+    Extract diffusion coefficients from single particle trajectories.
     
+    Fits mean squared displacement (MSD) and one- and two-component jump
+    distance distributions (JDD) to trajectories. For details regarding the
+    diffusion analysis, see Heermann et al., Nature Methods (2021).
+    (https://doi.org/10.1038/s41592-021-01260-x)
 
     Parameters
     ----------
     list_of_csv : list
-        DESCRIPTION.
-    output_file : HDF5 store
-        DESCRIPTION.
+        List of csv files containing trajectory information.
+    output_file : HDF5
+        HDF5 store where trajectory fitting results are stored in containers
+        with the name of each csv file as keys.
     frame_rate : float, optional
-        DESCRIPTION. The default is 199.8.
+        Frame rate of movie acquisition. The default is 199.8.
     pixel_size : float, optional
-        DESCRIPTION. The default is 84.4.
+        Pixel size of camera in nm. The default is 84.4.
     parallel : bool, optional
-        DESCRIPTION. The default is True.
+        Enable or disable parallelization. The default is True.
     processes : int, optional
-        DESCRIPTION. The default is (os.cpu_count()-1).
+        Number of worker processes. The default is ( os.cpu_count()-1 ).
 
     Returns
     -------
-    TYPE
-        DESCRIPTION.
+    None
 
     '''
     if os.path.exists(output_file):
@@ -100,8 +145,6 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
         
                 particle_id = traj_data['particle'].unique()
             
-                # useful_chunk_size = particle_id.shape[0] // (processes*10)
-                # number_of_chunks = particle_id.shape[0] // useful_chunk_size
                 number_of_chunks = 100
                 
                 particle_ids_split = np.array_split(particle_id, number_of_chunks)
@@ -162,6 +205,27 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
 
 
 def apply_calibration(df, slope=28191.37194436, offset=-20.47852753):
+    '''
+    Convert contrast to mass using a linear relationship.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing trajectory fitting results.
+    slope : float, optional
+        Slope of the linear contrast-to-mass relationship determined by
+        calibration measurement of standards with known mass in kDa.
+        The default is 28191.37194436 [kDa].
+    offset : float, optional
+        y-intercept of the linear contrast-to-mass relationship in kDa.
+        The default is -20.47852753 [kDa].
+
+    Returns
+    -------
+    pandas Series
+        Median mass of trajectories calculated as slope*df['med_c'] + offset.
+
+    '''
     return slope * df['med_c'] + offset
 
 
@@ -184,6 +248,23 @@ def calc_median_concurrent_trajectories(row, counts_dict):
         
 
 def calc_particle_number_linked(df):
+    '''
+    Calculate membrane-associated trajectory numbers.
+    
+    Each trajectory is assigned to an apparent membrane crowdedness determined
+    as the median of all trajectories detected during the trajectory’s lifetime.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing trajectory fitting results.
+
+    Returns
+    -------
+    pandas Series
+        Trajectory-wise membrane crowdedness.
+
+    '''
     frame_indices = df.apply(get_frames,axis=1)
     frame_indices_mod = np.concatenate((frame_indices.values),axis=0)
     

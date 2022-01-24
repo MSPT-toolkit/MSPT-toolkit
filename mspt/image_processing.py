@@ -1,15 +1,14 @@
+import os
+import h5py
+import numpy as np
+import multiprocessing as mp
 import tkinter as tk
 from tkinter import filedialog
-import h5py
 from ipywidgets import interact
 import ipywidgets as widgets
-import numpy as np
+from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from tqdm.notebook import tqdm
-import os
-import multiprocessing as mp
-
 
 try:
     import torch as th
@@ -48,16 +47,21 @@ def load_mp_nodialog(filename):
 _fileDialogLastDir=None
 
 def fileDialog(initialdir=None):
-    """
+    '''
     Opens file dialog and returns filename path that user selects.
 
-    Args:
-       initialdir (str):: Directory that is opened when file dialog is opened for the first time
-    
-    Returns:
-       path (str):: File path
+    Parameters
+    ----------
+    initialdir : str, optional
+        Directory that is opened when file dialog is opened for the first time.
+        The default is None.
 
-    """
+    Returns
+    -------
+    path : str
+        File path.
+
+    '''
     global _fileDialogLastDir
     # Create Tk root
     root = tk.Tk()
@@ -82,16 +86,21 @@ def fileDialog(initialdir=None):
 _directoryDialogLastDir = None
 
 def directoryDialog(initialdir=None):
-    """
+    '''
     Opens directory dialog and returns directory path that user selects.
 
-    Args:
-       initialdir (str):: Directory that is opened when file dialog is opened for the first time
-    
-    Returns:
-       path (str):: Directory path
+    Parameters
+    ----------
+    initialdir : str, optional
+        Directory that is opened when file dialog is opened for the first time.
+        The default is None.
 
-    """   
+    Returns
+    -------
+    path : str
+        Directory path.
+
+    '''  
     global _directoryDialogLastDir
     # Create Tk root
     root = tk.Tk()
@@ -114,19 +123,28 @@ def directoryDialog(initialdir=None):
 
 
 def find_filepaths(directory, extension="mp", exclude=None):
-    """
+    '''
     Find files with specified extension type in directory.
-
-    Returns a list of paths to all files of the chosen extension type 
-    within a directory. Optionally feed a string to the exclude argument
-    in order to exclude files that contain this text patch.
     
-    Keyword arguments:
-    directory -- directory path
-    extension -- file extension (default 'mp')
-    exclude   -- string pattern to filter files
-    """
+    Returns a list of paths to all files of the chosen extension type 
+    within a directory. Optionally, feed a string to the exclude argument
+    in order to exclude files that contain this text patch.
 
+    Parameters
+    ----------
+    directory : str
+        Directory path.
+    extension : str, optional
+        File extension. The default is "mp".
+    exclude : str, optional
+        String pattern to filter files. The default is None.
+
+    Returns
+    -------
+    filepaths : list
+        List of filepaths.
+
+    '''
     filepaths = []
     for root, dirs, files in os.walk(directory):
         for fn in files:
@@ -270,8 +288,9 @@ def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode =
 
 
 def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range = [], mode = 'raw', navg = 1, window_length = 1,  parallel = 0, GPU = 0):
-    """Load mp movie file.
-
+    '''
+    Load mp movie file.
+    
     Loads an mp movie file into a numpy 3D array and applies background removal
     strategies commonly used for iSCAT:
     - Mode 'raw': Loads the raw movie. For frame averaging, give an navg.
@@ -284,21 +303,41 @@ def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range
       movies of freely diffusing particles. Generates a median image starting
       at median_length/2 frames before and ending median_length/2 frames after
       the central frame and divides the central frame by this median image.
-    
-    Keyword arguments:
-    batch mode    -- enable or disable batch mode (bool)
-    file_to_load  -- file path (optional, applies if batch_mode=True)
-    homedir       -- initial directory of file dialog (optional,
-                     applies if batch_mode=False)
-    frame_range   -- frames to load and analyze. If empty, all frames are
-                     processed (tuple of ints)
-    mode          -- backround removal strategy ('raw', 'continuous_mean',
-                     or 'continuous_median')
-    navg          -- frame averaging before image processing (int)
-    window_length -- size of the mean or median window (int).
-    parallel      -- enable multiprocessing (bool)
-    GPU           -- enable CUDA (if available)
-    """
+
+    Parameters
+    ----------
+    batch_mode : bool, optional
+        Enable batch mode. The default is False.
+    file_to_load : str, optional
+        File path (optional, applies if batch_mode=True). The default is ''.
+    homedir : str, optional
+        Initial directory of the file dialog. Applies only if batch_mode=False.
+        The default is 'D:'.
+    frame_range : [] or [int, int], optional
+        Frames to load and analyze. If empty, all frames are processed.
+        The default is [].
+    mode : str, optional
+        Backround removal strategy. Choose between 'raw', 'continuous_mean', or
+        'continuous_median'. The default is 'raw'.
+    navg : int, optional
+        Frame averaging before image processing. The default is 1.
+    window_length : int, optional
+        Size of the moving mean or median window. The default is 1.
+    parallel : bool, optional
+        Enable multiprocessing. Applies only if mode='continuous_median' and
+        GPU=False. The default is 0.
+    GPU : bool, optional
+        Enable CUDA (if available). . Applies only if mode='continuous_median'
+        parallel=False. The default is 0.
+
+    Returns
+    -------
+    ndarray
+        Processed or raw (if mode='raw') movie as ndarray.
+    filename : str
+        File path.
+
+    '''
     
     assert mode == 'raw' or mode == 'continuous_mean' or mode == 'continuous_median', 'mode not recognised, choose between raw, continuous_mean or continuous_median'
     
