@@ -4,7 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from fastkde import fastKDE
 
-def plot_2D_KDE(data,
+def generate_2D_KDE(data,
                 x='median_mass',
                 y='Deff_global',
                 x_range=(0,200),
