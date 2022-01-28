@@ -2,6 +2,10 @@ import numpy as np
 from tqdm.notebook import tqdm
 import pandas as pd
 import multiprocessing as mp
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.pyplot as plt
+from ipywidgets import interact
+import ipywidgets as widgets
 
 import mspt.particle_detection as detect
 import mspt.psf.peak_fit as psf
@@ -26,13 +30,18 @@ def ROI_generator(full_image, centre_coordinates, ROI_size):
         DESCRIPTION.
 
     '''
-    ROI = full_image[centre_coordinates[0]-(ROI_size//2):centre_coordinates[0]+(ROI_size//2)+1, centre_coordinates[1]-(ROI_size//2):centre_coordinates[1]+(ROI_size//2)+1]
+    ROI = full_image[centre_coordinates[0]-(ROI_size//2):centre_coordinates[0]+(ROI_size//2)+1,
+                     centre_coordinates[1]-(ROI_size//2):centre_coordinates[1]+(ROI_size//2)+1]
     
     return ROI
 
-def frame_fit(img, thresh, method, DoG_estimates):
+def frame_fit(img, thresh, method, DoG_estimates,candidate_spots=None):
     fitted_particle_list = []
-    candidate_spots = detect.Pfind_simple(img, thresh)
+    try:
+        candidate_spots
+    except NameError: 
+        candidate_spots = detect.Pfind_simple(img, thresh)
+        
     if not len(candidate_spots) == 0:
         for pix in candidate_spots:
 
@@ -42,7 +51,12 @@ def frame_fit(img, thresh, method, DoG_estimates):
             if ROI.shape[0] == ROI_size and ROI.shape[1] == ROI_size:
                 try:
 
-                    fit_params = psf.fit_peak_DoG_mle(ROI, T_guess=DoG_estimates['T'], s_guess=DoG_estimates['s'], sigma_guess=DoG_estimates['sigma'], method=method, full_output=False)
+                    fit_params = psf.fit_peak_DoG_mle(ROI,
+                                                      T_guess=DoG_estimates['T'],
+                                                      s_guess=DoG_estimates['s'],
+                                                      sigma_guess=DoG_estimates['sigma'],
+                                                      method=method,
+                                                      full_output=False)
 
                     if fit_params[8]: # fit successful
                         list_entry = [fit_params[0],        # contrast
@@ -197,3 +211,47 @@ def fit_candidates(candidate_spots,  method, DoG_estimates):
     fitted_particle_list = np.asarray(fitted_particle_list)
     
     return fitted_particle_list
+
+
+def frame_slider_view_cands_dets(frames,
+                                 vmin=-0.01,
+                                 vmax=0.01,
+                                 method='trust-ncg',
+                                 DoG_estimates={'T' : 0.1423, 's' : 2.1436, 'sigma' : 1.2921},
+                                 figsize=(9.5, 9.5*35./128.)):
+    
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_axes((0.05,0.1, 0.8, 0.8))
+    
+    im = ax.imshow(frames[0,:,:], interpolation="None", vmin=vmin, vmax=vmax, cmap='binary_r')
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="2%", pad=0.2)
+    fig.colorbar(im, cax=cax)
+    
+    legend_elements = [plt.Circle((0,0), radius=3, fill=False, edgecolor='r', linewidth=2, linestyle='--', label='candidate spot' ),
+                       plt.Circle((0,0), radius=3, fill=False, edgecolor='y', linewidth=2, linestyle='-', label='fitted particle' )]
+    ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 1.175), frameon=False, fancybox=False, shadow=False, ncol=5)
+    
+    fig.canvas.draw_idle()
+    
+    def view_frame_cands_dets(frame, thresh):
+        while ax.patches:
+            ax.patches.pop();
+        im.set_data(frames[frame,:,:]);
+        
+        cands_found = detect.Pfind_simple(frames[frame,:,:], thresh);
+        [ax.add_patch(plt.Circle((j[1], j[0]), radius=3, fill=False, edgecolor='r', linewidth=2, linestyle='--' )) for j in cands_found];
+        
+        
+        detections = frame_fit(frames[frame,:,:], thresh, method, DoG_estimates, candidate_spots=cands_found);
+        [ax.add_patch(plt.Circle((j[2], j[1]), radius=3, fill=False, edgecolor='y', linewidth=2, linestyle='-' )) for j in detections];
+        
+        fig.canvas.draw_idle();
+        fig.canvas.flush_events();
+      
+    values_thresh = np.arange(0.0001, 0.01+0.00001, 0.00001)
+        
+    interact(view_frame_cands_dets,
+             frame=widgets.IntSlider(min=0, max=len(frames)-1, step=1, value=0, layout=widgets.Layout(width='90%', position='top', continuous_update=False)),
+             thresh=widgets.SelectionSlider(options=[("%g"%i,i) for i in values_thresh], value=0.0005, layout=widgets.Layout(width='90%', position='top'), continuous_update=False));

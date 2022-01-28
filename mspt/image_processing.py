@@ -369,19 +369,21 @@ def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range
         return processed_frames, filename
 
 
-def frame_slider(frames, vmin=0.01, vmax=0.01):
+def frame_slider(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35./128.)):
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_axes((0.05,0.1, 0.8, 0.8))
+    
+    im = ax.imshow(frames[0,:,:], interpolation="None", vmin=vmin, vmax=vmax, cmap='binary_r')
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="2%", pad=0.2)
+    fig.colorbar(im, cax=cax)
+    
+    fig.canvas.draw_idle()
+    
     def view_frame(frame):
-        plot_cache = {}
-        img = frames[frame];
+        im.set_data(frames[frame,:,:]);
+        fig.canvas.draw_idle();
+        fig.canvas.flush_events();
         
-        plot_cache["fig"], (ax) = plt.subplots(1, 1, figsize=(12*9/12, 5*9/12));
-        plot_cache["im"] = ax.imshow(img, vmin=vmin, vmax=vmax, cmap='binary_r');
-        
-        
-        divider = make_axes_locatable(ax);
-        cax = divider.append_axes("right", size="2%", pad=0.2);
-        plt.colorbar(plot_cache["im"], cax=cax);
-        #plt.figure('This title does not last');
-        #plot_cache["fig"].canvas.toolbar_visible = False;
-        
-    interact(view_frame, frame=widgets.IntSlider(min=0, max=len(frames)-1, step=1, value=0));
+    interact(view_frame, frame=widgets.IntSlider(min=0, max=len(frames)-1, step=1, value=0,layout=widgets.Layout(width='90%', position='top')));
