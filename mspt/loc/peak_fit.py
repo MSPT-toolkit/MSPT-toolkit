@@ -3,10 +3,10 @@ import scipy.optimize
 
 from numba import jit
 
-from mspt.psf.peak_fit_jacobians import fit_peak_DoG_mle_jacobian
-from mspt.psf.peak_fit_hessians import fit_peak_DoG_mle_hessian
+from mspt.loc.peak_fit_jacobians import fit_peak_DoG_mle_jacobian
+from mspt.loc.peak_fit_hessians import fit_peak_DoG_mle_hessian
 
-import mspt.psf.radialcenter as radialcenter
+import mspt.loc.radialcenter as radialcenter
 
 
 

@@ -8,7 +8,7 @@ from ipywidgets import interact
 import ipywidgets as widgets
 
 import mspt.particle_detection as detect
-import mspt.psf.peak_fit as psf
+import mspt.loc.peak_fit as psf
 
 
 def ROI_generator(full_image, centre_coordinates, ROI_size):
