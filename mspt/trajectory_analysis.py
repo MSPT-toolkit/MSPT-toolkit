@@ -16,29 +16,6 @@ import mspt.diff.diffusion_analysis as diff
 
 def get_csv_file_size(row):
     return os.path.getsize(row['file_data'])
-
-    '''
-    Find files with specified extension type in directory.
-    
-    Returns a list of paths to all files of the chosen extension type 
-    within a directory. Optionally feed a string to the exclude argument
-    in order to exclude files that contain this text patch.
-
-    Parameters
-    ----------
-    directory : str
-        Directory path.
-    extension : str, optional
-        File extension. The default is "mp".
-    exclude : str, optional
-        String pattern to filter files. The default is None.
-
-    Returns
-    -------
-    filepaths : list
-        List of filepaths.
-
-    '''
     
     
 def get_csv_files(directory):
@@ -48,7 +25,7 @@ def get_csv_files(directory):
 
     Parameters
     ----------
-    directory : strs
+    directory : str
         Directory path.
 
     Returns
@@ -93,14 +70,23 @@ def get_csv_files(directory):
     return list_of_csv
 
 
-def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4, parallel=True, processes=( os.cpu_count()-1 ) ):
+def fit_trajectories(list_of_csv,
+                     output_file,
+                     frame_rate=199.8,
+                     pixel_size=84.4, 
+                     n_timelags_MSD=None,
+                     n_timelags_JDD=None,
+                     parallel=True,
+                     processes=( os.cpu_count()-1 ) ):
     '''
     Extract diffusion coefficients from single particle trajectories.
     
     Fits mean squared displacement (MSD) and one- and two-component jump
     distance distributions (JDD) to trajectories. For details regarding the
-    diffusion analysis, see Heermann et al., Nature Methods (2021).
-    (https://doi.org/10.1038/s41592-021-01260-x)
+    diffusion analysis, see Heermann et al., Nature Methods (2021)
+    (https://doi.org/10.1038/s41592-021-01260-x), and the underlying MSD and
+    JDD papers (Michalet, 2010 (10.1103/PhysRevE.82.041914) [1], and Weimann et
+    al., 2013 [https://doi.org/10.1371/journal.pone.0064287])
 
     Parameters
     ----------
@@ -113,6 +99,14 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
         Frame rate of movie acquisition. The default is 199.8.
     pixel_size : float, optional
         Pixel size of camera in nm. The default is 84.4.
+    n_timelags_MSD : None or int, optional
+        Number of time lags to consider for linear mean squared displacement
+        fitting. If None, the number of time lags is estimated based on ref [1].
+        The default is None.
+    n_timelags_JDD : None or int, optional
+        Number of time lags to consider for jump distance distribution fitting.
+        If None, the same number of time lags is considered as in MSD fitting.
+        The default is None.
     parallel : bool, optional
         Enable or disable parallelization. The default is True.
     processes : int, optional
@@ -136,12 +130,12 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
             
             for csv_idx, csv_file in enumerate(list_of_csv):
                 traj_data = pd.read_csv(csv_file, usecols=['frame',
-                                                             'contrast',
-                                                             'x',
-                                                             'y',
-                                                             'sigma x',
-                                                             'sigma y',
-                                                             'particle'])
+                                                           'contrast',
+                                                           'x',
+                                                           'y',
+                                                           'sigma x',
+                                                           'sigma y',
+                                                           'particle'])
         
                 particle_id = traj_data['particle'].unique()
             
@@ -150,14 +144,16 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
                 particle_ids_split = np.array_split(particle_id, number_of_chunks)
             
                 with tqdm(total=particle_id.shape[0], unit='trajectories') as pbar:
-                    
+
                     pbar.set_description("Fitting trajectories... file {}/{}".format(str(csv_idx+1),str(len(list_of_csv))))
                     
                     result_objects = [pool.apply_async(diff.fit_JDD_MSD,
                                                        args=(chunk,
                                                              traj_data,
                                                              frame_rate,
-                                                             pixel_size),
+                                                             pixel_size,
+                                                             n_timelags_MSD,
+                                                             n_timelags_JDD),
                                                              callback=lambda _: pbar.update(chunk.shape[0])) for chunk in particle_ids_split]
                 
                     fits_list = list()
@@ -179,6 +175,7 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
     
     else:
         for csv_idx, csv_file in enumerate(list_of_csv):
+            
             traj_data = pd.read_csv(csv_file, usecols=['frame',
                                                          'contrast',
                                                          'x',
@@ -189,7 +186,12 @@ def fit_trajectories(list_of_csv, output_file, frame_rate=199.8, pixel_size=84.4
     
             particle_id = traj_data['particle'].unique()
             
-            df_JDD_MSD = diff.fit_JDD_MSD(particle_id,traj_data,frame_rate,pixel_size)
+            df_JDD_MSD = diff.fit_JDD_MSD(particle_id,
+                                          traj_data,
+                                          frame_rate,
+                                          pixel_size,
+                                          n_timelags_MSD,
+                                          n_timelags_JDD)
     
             with pd.HDFStore(output_file) as hdf_store:
                 hdf_store[csv_file] = df_JDD_MSD
@@ -231,19 +233,19 @@ def apply_calibration(df, slope=28191.37194436, offset=-20.47852753):
 
 def get_frames(row):
     if row['len'] % 2 == 1:
-        fr_min = int(row['centre frame'] - (row['len'] - 1)/2.0)
-        fr_max = int(row['centre frame'] + (row['len'] - 1)/2.0)
+        fr_min = int(row['center frame'] - (row['len'] - 1)/2.0)
+        fr_max = int(row['center frame'] + (row['len'] - 1)/2.0)
     else:
-        fr_min = int(np.floor(row['centre frame']) - (row['len'] - 2)/2.0)
-        fr_max = int(np.ceil(row['centre frame']) + (row['len'] - 2)/2.0)
+        fr_min = int(np.floor(row['center frame']) - (row['len'] - 2)/2.0)
+        fr_max = int(np.ceil(row['center frame']) + (row['len'] - 2)/2.0)
         
     frames = np.arange(fr_min,fr_max+1,1)
     
     return frames
 
-def calc_median_concurrent_trajectories(row, counts_dict):
-    frames = row['frame_indices']
-    particles = [counts_dict[key] for key in frames]
+def calc_median(frames, counts_dict):
+    # frames = row['frame_indices']
+    particles = [counts_dict[frame] for frame in frames]
     return np.median(np.asarray(particles))
         
 
@@ -262,7 +264,7 @@ def calc_particle_number_linked(df):
     Returns
     -------
     pandas Series
-        Trajectory-wise membrane crowdedness.
+        Trajectory-wise membrane crowdedness with regard to trajectory numbers.
 
     '''
     frame_indices = df.apply(get_frames,axis=1)
@@ -271,10 +273,49 @@ def calc_particle_number_linked(df):
     unique, counts = np.unique(frame_indices_mod, return_counts=True)
     counts_dict = dict(zip(unique, counts))
     
-    frame_indices = pd.DataFrame(frame_indices)
-    frame_indices.columns = ['frame_indices']
+    frame_indices = pd.Series(frame_indices, name='frame_indices')
     
-    return frame_indices.apply(calc_median_concurrent_trajectories,axis=1,args=(counts_dict,))
+    return frame_indices.apply(calc_median,args=(counts_dict,))
+
+
+def calc_particle_number_detected(df, csv_file):
+    '''
+    Calculate membrane-associated detection numbers.
+    
+    Each trajectory is assigned to an apparent membrane crowdedness determined
+    as the median of all detections during the trajectory’s lifetime.   
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing trajectory fitting results.
+    csv_file : str
+        CSV file containing trajectory information returned by trackpy.
+
+    Returns
+    -------
+    pandas Series
+        Trajectory-wise membrane crowdedness with regard to detection numbers.
+
+    '''
+    if csv_file.startswith('/'): # remove leading slash added py pandas HDFStore
+        csv_file = csv_file[1:]
+        
+    detections_folder = os.path.dirname(os.path.dirname(os.path.normpath(csv_file)))
+    detections_csv = glob.glob(detections_folder + './*.csv')
+
+    assert len(detections_csv) == 1, 'No or multiple detection CSV file(s) found in {}'.format(detections_folder)
+    
+    dets_df = pd.read_csv(detections_csv[0], usecols=['frame', 'contrast'])
+
+    unique_dets, counts_dets = np.unique(dets_df['frame'].values, return_counts=True)
+    counts_dict_dets = dict(zip(unique_dets, counts_dets))
+    
+    frame_indices_trajs = df.apply(get_frames,axis=1)
+    frame_indices_trajs.name = 'frame_indices'
+    
+    return frame_indices_trajs.apply(calc_median,args=(counts_dict_dets,))
+
 
 if __name__ == '__main__':
     fit_trajectories()

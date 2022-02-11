@@ -34,14 +34,17 @@ def generate_2D_KDE(data,
         x variable. Choose between 'median_mass', 'mean_mass', or their
         contrast analogues ('med_c, 'mean_c'). The default is 'median_mass'.
     y : str, optional
-        y variable. Choose between 'D_MSD_n4' (MSD fit), 'Deff_JDD' (JDD fit),
-        or 'Deff_global' (global MSD and JDD fit).
-        The default is 'Deff_global'.
-    x_range : tuple, optional
+        y variable. Choose between 'D_MSD' (MSD fit), 'D_JDD' (JDD fit), 
+        'Deff_JDD_2c' (2-component JDD fit), 'Deff_JDD' (1 or 2-component JDD fit),
+        'D_MSD_JDD' (global MSD and JDD fit), 'Deff_MSD_JDD_2c'
+        (global MSD and JDD fit, 2 components), 'Deff_MSD_JDD'
+        (global MSD and JDD fit, 1 or 2 components).
+        The default is 'D_MSD'.
+    x_range : (float, float), optional
         x axis limit. The default is (0,200).
-    y_range : tuple, optional
+    y_range : (float, float), optional
         y axis limit in log scale. The default is (-1,1).
-    figsize : tuple, optional
+    figsize : (float, float), optional
         Size of figure frame in inches. The default is (5,5).
     traj_length : int or None, optional
         Minimum trajectory length in frames. The default is 5.
@@ -76,8 +79,17 @@ def generate_2D_KDE(data,
         filtered DataFrame.
 
     '''
-    assert x in ('median_mass', 'mean_mass', 'med_c', 'mean_c'), 'Choose between median_mass, mean_mass, med_c, mean_c'
-    assert y in ('D_MSD_n4', 'Deff_JDD', 'Deff_global'), 'Choose between D_MSD_n4, Deff_JDD or Deff_global'
+    assert x in ('median_mass',
+                 'mean_mass',
+                 'med_c',
+                 'mean_c'), 'Choose between median_mass, mean_mass, med_c, or mean_c'
+    assert y in ('D_MSD',
+                 'D_JDD',
+                 'Deff_JDD_2c',
+                 'Deff_JDD',
+                 'D_MSD_JDD',
+                 'Deff_MSD_JDD_2c',
+                 'Deff_MSD_JDD'), 'Choose between D_MSD, D_JDD, Deff_JDD_2c, Deff_JDD, D_MSD_JDD, Deff_MSD_JDD_2c, or Deff_MSD_JDD'
     
     fig = plt.figure(figsize=figsize)
     
@@ -121,23 +133,12 @@ def generate_2D_KDE(data,
     # dat = dat[dat['median_mass']<=600.0]
     dat = dat[dat['median_mass']>=0]
     
-    # Calculate effective diffusion coefficient from 1 and 2 component
-    # JDD analysisbased on chi squared criteria
-    dat['Deff_2c'] = dat['2c_JDD_A_1_n4'].copy() * dat['2c_JDD_D_1_n4'].copy() + \
-                     dat['2c_JDD_A_2_n4'].copy() * dat['2c_JDD_D_2_n4'].copy()
-    dat['Deff_JDD'] = np.where(dat['chi_JDD_n4']<=dat['2c_JDD_chi_n4'],dat['D_JDD_n4'],dat['Deff_2c'])
-    
-    # Calculate effective diffusion coefficient from global MSD and JDD
-    # analysis based on chi squared criteria
-    dat['Deff_MSD_JDD_2c'] = dat['A_1_MSD_JDD_n4_c2'].copy() * dat['D_1_MSD_JDD_n4_c2'].copy() + \
-                             dat['A_2_MSD_JDD_n4_c2'].copy() * dat['D_2_MSD_JDD_n4_c2'].copy()
-    dat['Deff_global'] = np.where(dat['chi_MSD_JDD_n4']<=dat['chi_MSD_JDD_n4_c2'],dat['D_MSD_JDD_n4'],dat['Deff_MSD_JDD_2c'])
-    
     # Filter out very slow particles.
     dat = dat[dat[y]>0.0001]
+    
     # Filter out particles where first 3 mean squared displacements are not
     # monotonously increasing
-    dat = dat[dat['MSD_check']==0.0]
+    dat = dat[dat['MSD_check']==True]
 
     # Number of datapoints to calculate KDE
     numPoints = 2**12+1
@@ -158,19 +159,19 @@ def generate_2D_KDE(data,
                              ecfPrecision=2,
                              logAxes=[False,False])
     # 1D KDE of x variable
-    myPDF_x,axes_x = fastKDE.pdf(dat[x].values,
-                                 axes=[np.linspace(mass_center-num_x/2, mass_center+num_x/2,numPoints)],
-                                 positiveShift=True, 
-                                 doApproximateECF=True,
-                                 ecfPrecision=2,
-                                 logAxes=False)
+    # myPDF_x,axes_x = fastKDE.pdf(dat[x].values,
+    #                              axes=[np.linspace(mass_center-num_x/2, mass_center+num_x/2,numPoints)],
+    #                              positiveShift=True, 
+    #                              doApproximateECF=True,
+    #                              ecfPrecision=2,
+    #                              logAxes=False)
     # 1D KDE of y variable
-    myPDF_y,axes_y = fastKDE.pdf(np.log10(dat[y].values), # calculate diffusion KDE in log-space
-                                 axes=[np.linspace(D_center-num_y/2, D_center+num_y/2,numPoints)],
-                                 positiveShift=True,
-                                 doApproximateECF=True,
-                                 ecfPrecision=2,
-                                 logAxes=False)
+    # myPDF_y,axes_y = fastKDE.pdf(np.log10(dat[y].values), # calculate diffusion KDE in log-space
+    #                              axes=[np.linspace(D_center-num_y/2, D_center+num_y/2,numPoints)],
+    #                              positiveShift=True,
+    #                              doApproximateECF=True,
+    #                              ecfPrecision=2,
+    #                              logAxes=False)
 
     v1,v2 = axes
     
@@ -210,7 +211,7 @@ def generate_2D_KDE(data,
     
     for c in cs.collections:
         c.set_edgecolor("face")
-        c.set_linewidth(0.000000000001)
+        c.set_linewidth(0.000000000001) # see https://github.com/matplotlib/matplotlib/issues/9574
 
    
     line_colors = colors.copy()
