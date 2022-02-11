@@ -1,9 +1,16 @@
+"""
+    mspt.loc.peak_fit_hessians.py
+    
+    ~~~~~~~~~~~~~~~~~~~~
+    
+    Supply analytical Jacobian matrices for MLE to scipy.optimize.minimize
+"""
 import numpy as np
 from numba import jit
 
 
 @jit(nopython=True, fastmath=True, nogil=False, parallel=False)
-def fit_peak_DoG_mle_hessian(parms, X, Y, im,s_fixed=True):
+def fit_peak_DoG_mle_hessian(parms, X, Y, im, s_fixed=True):
     A=parms[0]
     dx=parms[1]
     dy=parms[2]

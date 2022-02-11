@@ -29,7 +29,7 @@ def _norm_logpdf(x):
 
 
 @jit(nopython=True, nogil=False, parallel=False)
-def err_manually(parms, X, Y, im):
+def err_nll(parms, X, Y, im):
     return np.sum(- _norm_logpdf( (difference_of_gaussians_im(parms[0], # amp
                                                               parms[1], # dx
                                                               parms[2], # dy
@@ -116,7 +116,7 @@ def fit_peak_DoG_mle(
     # bounds = ((-np.inf, np.inf), (-lh, lh), (-lh, lh), (0.0, 1.0), (1.0, 10.0), (np.inf, -np.inf), (0.1, np.inf))
 
     res = scipy.optimize.minimize(
-        err_manually,
+        err_nll,
         x0,
         args=(X, Y, peak),
         method=method,

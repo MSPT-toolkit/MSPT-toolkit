@@ -94,7 +94,30 @@ def identify_candidates(data,
     return candidate_locs
 
     
-def frame_slider_view_cands(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35./128.)):
+def frame_slider_view_cands(frames,
+                            vmin=-0.01,
+                            vmax=0.01,
+                            figsize=(9.5, 9.5*35./128.)):
+    '''
+    Browse through movie interactively with frame slider and detection
+    threshold selection.
+
+    Parameters
+    ----------
+    frames : ndarray
+        Movie file with dimensions (frames, x, y).
+    vmin : float, optional
+        Minimum contrast value that the colormap covers. The default is -0.01.
+    vmax : float, optional
+        Maximum contrast value that the colormap covers. The default is 0.01.
+    figsize : (float, float), optional
+        Size of figure frame in inches. The default is (9.5, 9.5*35./128.).
+
+    Returns
+    -------
+    None.
+
+    '''
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes((0.05,0.1, 0.8, 0.8))
     
@@ -104,7 +127,7 @@ def frame_slider_view_cands(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35.
     cax = divider.append_axes("right", size="2%", pad=0.2)
     fig.colorbar(im, cax=cax)
     
-    fig.canvas.draw_idle()
+    #fig.canvas.draw_idle()
     
     def view_frame_cands(frame, thresh):
         while ax.patches:
@@ -112,7 +135,7 @@ def frame_slider_view_cands(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35.
         im.set_data(frames[frame,:,:]);
         
         cands_found = Pfind_simple(frames[frame,:,:], thresh);
-        [ax.add_patch(plt.Circle((j[1], j[0]), radius=3, fill=False, edgecolor='r', linewidth=2, linestyle='--' )) for j in cands_found];
+        [ax.add_patch(plt.Circle((j[1], j[0]), radius=3, fill=False, edgecolor='#ff8859', linewidth=2.5, linestyle=(0, (2.5, 2.5)) )) for j in cands_found];
         
         fig.canvas.draw_idle();
         fig.canvas.flush_events();

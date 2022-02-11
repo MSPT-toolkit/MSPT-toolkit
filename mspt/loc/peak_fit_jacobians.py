@@ -1,3 +1,10 @@
+"""
+    mspt.loc.peak_fit_jacobians.py
+    
+    ~~~~~~~~~~~~~~~~~~~~
+    
+    Supply analytical Jacobian matrices for MLE to scipy.optimize.minimize
+"""
 import numpy as np
 from numba import jit
 

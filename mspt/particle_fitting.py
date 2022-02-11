@@ -4,12 +4,12 @@ import pandas as pd
 import multiprocessing as mp
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from ipywidgets import interact
 import ipywidgets as widgets
 
 import mspt.particle_detection as detect
 import mspt.loc.peak_fit as psf
-
 
 def ROI_generator(full_image, centre_coordinates, ROI_size):
     '''Return array of size (ROI_size, ROI_size) 
@@ -18,16 +18,16 @@ def ROI_generator(full_image, centre_coordinates, ROI_size):
     Parameters
     ----------
     full_image : ndarray
-        DESCRIPTION.
-    centre_coordinates : tuple
-        DESCRIPTION.
+        Image.
+    centre_coordinates : (int, int)
+        Center coordinates of ROI.
     ROI_size : int
-        DESCRIPTION.
+        Size of returned ROI.
 
     Returns
     -------
     ROI : ndarray
-        DESCRIPTION.
+        Excised array of size (ROI_size, ROI_size) around center coordinates.
 
     '''
     ROI = full_image[centre_coordinates[0]-(ROI_size//2):centre_coordinates[0]+(ROI_size//2)+1,
@@ -84,13 +84,13 @@ def pass_shared_arr(shared_memory_array, array_shape):
     arr_dict['array_shape'] = array_shape
 
 
-def particle_fitter_parallel(movie,
-                             halfsize,
-                             thresh,
-                             frame_range=[],
-                             processes=( mp.cpu_count()-1 ),
-                             method='trust-ncg',
-                             DoG_estimates={'T' : 0.1423, 's' : 2.1436, 'sigma' : 1.2921}):
+def particle_fitter(movie,
+                    halfsize,
+                    thresh,
+                    frame_range=[],
+                    processes=( mp.cpu_count()-1 ),
+                    method='trust-ncg',
+                    DoG_estimates={'T' : 0.1423, 's' : 2.1436, 'sigma' : 1.2921}):
     '''
     Identify and localize single particles in movie.
 
@@ -142,9 +142,9 @@ def particle_fitter_parallel(movie,
     # Copy movie data to shared array.
     np.copyto(shared_arr_np, movie)
 
-
-    useful_chunk_size = cands.shape[0] // (processes*10)
-    number_of_chunks = cands.shape[0] // useful_chunk_size
+    # useful_chunk_size = cands.shape[0] // (processes*10)
+    # number_of_chunks = cands.shape[0] // useful_chunk_size
+    number_of_chunks = 100
     
     cands_split = np.array_split(cands, number_of_chunks)
     
@@ -219,7 +219,30 @@ def frame_slider_view_cands_dets(frames,
                                  method='trust-ncg',
                                  DoG_estimates={'T' : 0.1423, 's' : 2.1436, 'sigma' : 1.2921},
                                  figsize=(9.5, 9.5*35./128.)):
-    
+    '''
+    Browse through movie interactively with frame slider, detection threshold
+    selection and successful particle fits.
+
+    Parameters
+    ----------
+    frames : ndarray
+        Movie file with dimensions (frames, x, y).
+    vmin : float, optional
+        Minimum contrast value that the colormap covers. The default is -0.01.
+    vmax : float, optional
+        Maximum contrast value that the colormap covers. The default is 0.01.
+    method : str, optional
+        Type of solver of scipy.optimize.minimize. The default is 'trust-ncg'.
+    DoG_estimates : dict, optional
+        Initial guesses for PSF parameters used for peak fitting. The default is {'T' : 0.1423, 's' : 2.1436, 'sigma' : 1.2921}.
+    figsize : (float, float), optional
+        Size of figure frame in inches. The default is (9.5, 9.5*35./128.).
+
+    Returns
+    -------
+    None.
+
+    '''
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes((0.05,0.1, 0.8, 0.8))
     
@@ -229,11 +252,11 @@ def frame_slider_view_cands_dets(frames,
     cax = divider.append_axes("right", size="2%", pad=0.2)
     fig.colorbar(im, cax=cax)
     
-    legend_elements = [plt.Circle((0,0), radius=3, fill=False, edgecolor='r', linewidth=2, linestyle='--', label='candidate spot' ),
-                       plt.Circle((0,0), radius=3, fill=False, edgecolor='y', linewidth=2, linestyle='-', label='fitted particle' )]
-    ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 1.175), frameon=False, fancybox=False, shadow=False, ncol=5)
+    legend_elements = [Line2D([0], [0], color='#ff8859', linewidth=2.5, linestyle=(0, (2.5, 2.5)), label='candidate spot'),
+                       Line2D([0], [0], color='r',       linewidth=2.5, linestyle='-',             label='fitted particle')]
+    ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, 1.175), frameon=False, fancybox=False, shadow=False, ncol=2)
     
-    fig.canvas.draw_idle()
+    #fig.canvas.draw_idle()
     
     def view_frame_cands_dets(frame, thresh):
         while ax.patches:
@@ -241,11 +264,11 @@ def frame_slider_view_cands_dets(frames,
         im.set_data(frames[frame,:,:]);
         
         cands_found = detect.Pfind_simple(frames[frame,:,:], thresh);
-        [ax.add_patch(plt.Circle((j[1], j[0]), radius=3, fill=False, edgecolor='r', linewidth=2, linestyle='--' )) for j in cands_found];
+        [ax.add_patch(plt.Circle((j[1], j[0]), radius=3, fill=False, edgecolor='#ff8859', linewidth=2.5, linestyle=(0, (2.5, 2.5)) )) for j in cands_found];
         
         
         detections = frame_fit(frames[frame,:,:], thresh, method, DoG_estimates, candidate_spots=cands_found);
-        [ax.add_patch(plt.Circle((j[2], j[1]), radius=3, fill=False, edgecolor='y', linewidth=2, linestyle='-' )) for j in detections];
+        [ax.add_patch(plt.Circle((j[2], j[1]), radius=3, fill=False, edgecolor='r', linewidth=2.5, linestyle='-' )) for j in detections];
         
         fig.canvas.draw_idle();
         fig.canvas.flush_events();

@@ -369,7 +369,29 @@ def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range
         return processed_frames, filename
 
 
-def frame_slider(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35./128.)):
+def frame_slider(frames,
+                 vmin=-0.01,
+                 vmax=0.01,
+                 figsize=(9.5, 9.5*35./128.)):
+    '''
+    Browse through movie interactively with frame slider.
+
+    Parameters
+    ----------
+    frames : ndarray
+        Movie file with dimensions (frames, x, y).
+    vmin : float, optional
+        Minimum contrast value that the colormap covers. The default is -0.01.
+    vmax : float, optional
+        Maximum contrast value that the colormap covers. The default is 0.01.
+    figsize : (float, float), optional
+        Size of figure frame in inches. The default is (9.5, 9.5*35./128.).
+
+    Returns
+    -------
+    None.
+
+    '''
     fig = plt.figure(figsize=figsize)
     ax = fig.add_axes((0.05,0.1, 0.8, 0.8))
     
@@ -379,7 +401,7 @@ def frame_slider(frames, vmin=-0.01, vmax=0.01, figsize=(9.5, 9.5*35./128.)):
     cax = divider.append_axes("right", size="2%", pad=0.2)
     fig.colorbar(im, cax=cax)
     
-    fig.canvas.draw_idle()
+    #fig.canvas.draw_idle()
     
     def view_frame(frame):
         im.set_data(frames[frame,:,:]);
