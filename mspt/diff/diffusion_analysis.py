@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.optimize import least_squares
+from scipy.optimize import OptimizeResult
+from numba.typed import List
 
 from mspt.diff.diffusion_analysis_functions import calc_msd, calc_jd_nth, lin_fit_msd_offset, lin_fit_msd_offset_iterative
 from mspt.diff.diffusion_analysis_functions import fit_jdd_cumul_off, fit_jdd_cumul_off_2c, fit_msd_jdd_cumul_off_global, fit_msd_jdd_cumul_off_global_2c
@@ -61,8 +63,11 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         JDDs = list()
         for tau in np.arange(1,n_tau_JDD+1,1):
             jdd = calc_jd_nth(x, y, n=tau)
-            jdd_sorted = np.sort(jdd)
+            jdd_sorted = np.empty((jdd.size+1,),dtype=np.float64)
+            jdd_sorted[0] = 0.
+            jdd_sorted[1:] = np.sort(jdd)
             JDDs.append(jdd_sorted)
+            JDDs = List(JDDs)
         ######################################
         
         
@@ -71,33 +76,28 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         bounds_x0_1c = ([0.00001, -np.inf], [np.inf, np.inf])
         try: 
             res_lsq_jdd = least_squares(fit_jdd_cumul_off,
-                                        [1.0,0.005],
+                                        np.array([1.0,0.005]),
                                         jac=jdd_jac,
                                         args=(JDDs,length,1./frame_rate,n_tau_JDD),
-                                        bounds = bounds_x0_1c,
-                                        method = 'dogbox',
+                                        method = 'lm',
                                         x_scale='jac')
+            
         except: 
             try: # Restrict the offset parameter if fit failed
                 jdd_1c_flag = True # flag trajectory if fit failed with initial boundary conditions
                 bounds_x0_1c = ([0.00001, -0.03],[np.inf, np.inf])
                 res_lsq_jdd = least_squares(fit_jdd_cumul_off,
-                                            [0.5,0.005],
+                                            np.array([0.5,0.005]),
                                             jac=jdd_jac,
                                             args=(JDDs,length,1./frame_rate,n_tau_JDD),
                                             bounds = bounds_x0_1c,
                                             method = 'dogbox',
                                             x_scale='jac')
-            except: # Restrict the offset parameter to non-negative values if second fit failed
-                jdd_1c_flag = True # flag trajectory if fit failed with initial boundary conditions
-                bounds_x0_1c = ([0.0001, 0.0],[np.inf, np.inf])
-                res_lsq_jdd = least_squares(fit_jdd_cumul_off,
-                                            [0.5,0.005],
-                                            jac=jdd_jac,
-                                            args=(JDDs,length,1./frame_rate,n_tau_JDD),
-                                            bounds = bounds_x0_1c,
-                                            method = 'trf',
-                                            x_scale='jac')
+            except: # Fill results dict manually if second fit failed
+                res_lsq_jdd = OptimizeResult( {'x' : np.full(2, np.nan),
+                                               'fun': np.array([np.nan]),
+                                               'success': False} )
+
         ######################################
         
         ### JDD fit: 2 components ############
@@ -105,105 +105,106 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         bounds_x0_2c = ([0.00001, 0.00001, 0.0,-np.inf],[np.inf, np.inf, 1.0,np.inf])
         try: 
             res_lsq_jdd_2c = least_squares(fit_jdd_cumul_off_2c,
-                                           [0.1,1.0,0.5,0.005],
+                                           np.array([0.1,1.0,0.5,0.005]),
                                            jac=jdd_jac_2c,
                                            args=(JDDs,length,1./frame_rate,n_tau_JDD),
-                                           bounds = bounds_x0_2c,
-                                           method = 'dogbox',
+                                           method = 'lm',
                                            x_scale='jac')
+            
         except:
             try: # Restrict the offset parameter if fit failed
                 jdd_2c_flag = True # flag trajectory if fit failed with initial boundary conditions
                 bounds_x0_2c = ([0.00001, 0.00001, 0.0,-0.03],[np.inf, np.inf, 1.0,np.inf])           
                 res_lsq_jdd_2c = least_squares(fit_jdd_cumul_off_2c,
-                                               [0.1,1.0,0.5,0.005],
+                                               np.array([0.1,1.0,0.5,0.005]),
                                                jac=jdd_jac_2c,
                                                args=(JDDs,length,1./frame_rate,n_tau_JDD),
                                                bounds = bounds_x0_2c,
                                                method = 'dogbox',
                                                x_scale='jac')
-            except: # Restrict the offset parameter to non-negative values if second fit failed
-                jdd_2c_flag = True # flag trajectory if fit failed with initial boundary conditions
-                bounds_x0_2c = ([0.00001, 0.00001, 0.0,0.0],[np.inf, np.inf, 1.0,np.inf])
-                res_lsq_jdd_2c = least_squares(fit_jdd_cumul_off_2c,
-                                               [0.1,1.0,0.5,0.005],
-                                               jac=jdd_jac_2c,
-                                               args=(JDDs,length,1./frame_rate,n_tau_JDD),
-                                               bounds = bounds_x0_2c,
-                                               method = 'trf',
-                                               x_scale='jac')
+            except: # Fill results dict manually if second fit failed
+                res_lsq_jdd_2c = OptimizeResult( {'x' : np.full(4, np.nan),
+                                                  'fun': np.array([np.nan]),
+                                                  'success': False} )
+
         ######################################
+
+
+
+
+
 
 
         ### Global fit MSD & JDD: 1 component
         msd_jdd_1c_flag = False  
-        bounds_x0_1c = ([0.0001, -np.inf],[np.inf, np.inf])
+        bounds_x0_1c = ([0.00001, -np.inf],[np.inf, np.inf])
         try:
             res_lsq_msd_jdd_1c = least_squares(fit_msd_jdd_cumul_off_global,
-                                               [1.0,0.004],
+                                               np.array([1.0,0.004]),
                                                jac=msd_jdd_jac,
                                                args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
-                                               bounds = bounds_x0_1c,
-                                               method = 'dogbox',
+                                               method = 'lm',
                                                x_scale='jac')
+            
         except:
             try: # Restrict the offset parameter if fit failed
                 msd_jdd_1c_flag = True
-                bounds_x0_1c = ([0.0001, -0.03],[np.inf, np.inf])
+                bounds_x0_1c = ([0.00001, -0.03],[np.inf, np.inf])
                 res_lsq_msd_jdd_1c = least_squares(fit_msd_jdd_cumul_off_global,
-                                                   [1.0,0.004],
+                                                   np.array([1.0,0.004]),
                                                    jac=msd_jdd_jac,
                                                    args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
                                                    bounds = bounds_x0_1c,
                                                    method = 'dogbox',
                                                    x_scale='jac')
-            except: # Restrict the offset parameter to non-negative values if second fit failed
-                msd_jdd_1c_flag = True
-                bounds_x0_1c = ([0.0001, 0.0],[np.inf, np.inf])
-                res_lsq_msd_jdd_1c = least_squares(fit_msd_jdd_cumul_off_global,
-                                                   [1.0,0.004],
-                                                   jac=msd_jdd_jac,
-                                                   args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
-                                                   bounds = bounds_x0_1c,
-                                                   method = 'trf',
-                                                   x_scale='jac')
+            except: # Fill results dict manually if second fit failed
+                res_lsq_msd_jdd_1c = OptimizeResult( {'x' : np.full(2, np.nan),
+                                                      'fun': np.array([np.nan]),
+                                                      'success': False} )
+
         ######################################
+        
+        
+        
+        
+        
         
         ### Global fit MSD & JDD: 2 components
         msd_jdd_2c_flag = False
         bounds_x0_2c = ([0.00001, 0.00001, 0.0,-np.inf],[np.inf, np.inf, 1.0,np.inf])
         try:
             res_lsq_msd_jdd_2c = least_squares(fit_msd_jdd_cumul_off_global_2c,
-                                               [0.1,1.0,0.5,0.004],
+                                               np.array([0.1,1.0,0.5,0.004]),
                                                jac=msd_jdd_jac_2c,
                                                args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
-                                               bounds = bounds_x0_2c,
-                                               method = 'trf',
+                                               method = 'lm',
                                                x_scale='jac')
+            
         except:
             try: # Restrict the offset parameter if fit failed
                 msd_jdd_2c_flag = True
                 bounds_x0_2c = ([0.00001, 0.00001, 0.0,-0.03],[np.inf, np.inf, 1.0,np.inf])
                 res_lsq_msd_jdd_2c = least_squares(fit_msd_jdd_cumul_off_global_2c,
-                                                   [0.1,1.0,0.5,0.004],
+                                                   np.array([0.1,1.0,0.5,0.004]),
                                                    jac=msd_jdd_jac_2c,
                                                    args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
                                                    bounds = bounds_x0_2c,
                                                    method = 'trf',
                                                    x_scale='jac')
-            except: # Restrict the offset parameter to non-negative values if second fit failed
-                msd_jdd_2c_flag = True
-                bounds_x0_2c = ([0.00001, 0.00001, 0.0,0.0],[np.inf, np.inf, 1.0,np.inf])
-                res_lsq_msd_jdd_2c = least_squares(fit_msd_jdd_cumul_off_global_2c,
-                                                   [0.1,1.0,0.5,0.004],
-                                                   jac=msd_jdd_jac_2c,
-                                                   args=(JDDs,MSD,length,1./frame_rate,n_tau_JDD),
-                                                   bounds = bounds_x0_2c,
-                                                   method = 'trf',
-                                                   x_scale='jac')
+            except: # Fill results dict manually if second fit failed
+                res_lsq_msd_jdd_2c = OptimizeResult( {'x' : np.full(4, np.nan),
+                                                      'fun': np.array([np.nan]),
+                                                      'success': False} )
+
         ######################################
         
         
+        
+        
+        
+        
+        
+    
         tmp_array = np.full((34),np.nan)
         
         ### Trajectory statistics ##############################################################################################################

@@ -26,12 +26,13 @@ def calc_jd_nth(x,y,n=1):
                               
     return jump_distance
 
+@jit(nopython=True,nogil=False,cache=True)
 def jdd_cumul_off(parms, r, delta_t):
     D_coeff = parms[0]
     off = parms[1]
     return (1.0 - np.exp(-(r**2/(4.0 * (D_coeff *delta_t + off)))))
 
-
+@jit(nopython=True,nogil=False,cache=True)
 def jdd_cumul_off_2c(parms, r, delta_t):
     D_coeff_1 = parms[0]
     D_coeff_2 = parms[1]
@@ -41,31 +42,33 @@ def jdd_cumul_off_2c(parms, r, delta_t):
     return (1.0 - A_1 * np.exp( -(r**2/(4.0 * (D_coeff_1 *delta_t + off))) ) - 
             A_2 * np.exp( -(r**2/(4.0 * (D_coeff_2 *delta_t + off))) ))
 
-
+@jit(nopython=True,nogil=False,cache=True)
 def fit_jdd_cumul_off(parms,JDDs,length,delta_t,n_delta_t):
-    residuals = list()
+    residuals = np.empty((length*n_delta_t-sum(range(n_delta_t))), dtype=np.float64)
     
+    i = 0
     for nlag in np.arange(1,n_delta_t+1,1):
         jdd_sorted = JDDs[nlag-1]
 
-        residuals.append( ((np.arange(jdd_sorted.size+1)/jdd_sorted.size) -
-                            jdd_cumul_off(parms, np.concatenate([[0.0],jdd_sorted]), nlag*delta_t)) * float((length/(jdd_sorted.size+1))) )
-    
-    residuals = np.concatenate((residuals))
+        residuals[i:i+jdd_sorted.size] = ( ((np.arange(jdd_sorted.size)/(jdd_sorted.size-1) ) -
+                            jdd_cumul_off(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) )
+        
+        i += jdd_sorted.size
 
     return residuals
 
-
+@jit(nopython=True,nogil=False,cache=True)
 def fit_jdd_cumul_off_2c(parms,JDDs,length,delta_t,n_delta_t):
-    residuals = list()
+    residuals = np.empty((length*n_delta_t-sum(range(n_delta_t))), dtype=np.float64)
     
+    i = 0
     for nlag in np.arange(1,n_delta_t+1,1):
         jdd_sorted = JDDs[nlag-1]
 
-        residuals.append( ((np.arange(jdd_sorted.size+1)/jdd_sorted.size) - 
-                            jdd_cumul_off_2c(parms, np.concatenate([[0.0],jdd_sorted]), nlag*delta_t)) * float((length/(jdd_sorted.size+1))) )
-         
-    residuals = np.concatenate((residuals))
+        residuals[i:i+jdd_sorted.size] = ( ((np.arange(jdd_sorted.size)/(jdd_sorted.size-1) ) -
+                            jdd_cumul_off_2c(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) )
+        
+        i += jdd_sorted.size
 
     return residuals
 
@@ -173,43 +176,51 @@ def lin_fit_msd_offset_iterative(data,delta_t,max_it=10):
     
     return [slope/4., offset/4., SSR, p_est]
 
+@jit(nopython=True,nogil=False,cache=True)
+def fit_msd_jdd_cumul_off_global(parms,JDDs,MSD,length,delta_t,n_delta_t):   
+    resid_len_JDD = length*n_delta_t-sum(range(n_delta_t))
+    residuals_JDD = np.empty((resid_len_JDD), dtype=np.float64)
 
-def fit_msd_jdd_cumul_off_global(parms,JDDs,MSD,length,delta_t,n_delta_t):
-    
-    residuals_JDD = list()
-
+    i = 0
     for nlag in np.arange(1,n_delta_t+1,1):
-
         jdd_sorted = JDDs[nlag-1]
         
-        residuals_JDD.append( ((np.arange(jdd_sorted.size+1)/jdd_sorted.size) - 
-                                jdd_cumul_off(parms, np.concatenate([[0.0],jdd_sorted]), nlag*delta_t)) * float(((length)/(jdd_sorted.size+1))) )
+        residuals_JDD[i:i+jdd_sorted.size] = ( ((np.arange(jdd_sorted.size)/(jdd_sorted.size-1) ) -
+                            jdd_cumul_off(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) )
+        
+        i += jdd_sorted.size       
         
         
-    residuals_JDD = np.concatenate((residuals_JDD))
-
-
-    residuals_MSD = ( (MSD -  (4*parms[0]*(np.arange(1,len(MSD)+1,1)*delta_t) + 4. * parms[1])) * ((length-1) * n_delta_t)/len(MSD)  * 0.5/np.mean(MSD) )
+    residuals_MSD = ( (MSD - (4*parms[0]*(np.arange(1,MSD.size+1,1)*delta_t) + 4. * parms[1])) * \
+                     ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
     
-    return np.concatenate((residuals_JDD, residuals_MSD))
+    residuals = np.empty((resid_len_JDD + MSD.size), dtype=np.float64)
+    residuals[:resid_len_JDD] = residuals_JDD
+    residuals[resid_len_JDD:] = residuals_MSD
+    
+    return residuals
 
-
+@jit(nopython=True,nogil=False,cache=True)
 def fit_msd_jdd_cumul_off_global_2c(parms,JDDs,MSD,length,delta_t,n_delta_t):
-    
-    residuals_JDD = list()
+    resid_len_JDD = length*n_delta_t-sum(range(n_delta_t))
+    residuals_JDD = np.empty((resid_len_JDD), dtype=np.float64)
 
+    i = 0
     for nlag in np.arange(1,n_delta_t+1,1):
-
         jdd_sorted = JDDs[nlag-1]
         
-        residuals_JDD.append( ((np.arange(jdd_sorted.size+1)/jdd_sorted.size) -
-                                jdd_cumul_off_2c(parms, np.concatenate([[0.0],jdd_sorted]), nlag*delta_t)) * float(((length)/(jdd_sorted.size+1))) )
+        residuals_JDD[i:i+jdd_sorted.size] = ( ((np.arange(jdd_sorted.size)/(jdd_sorted.size-1) ) -
+                            jdd_cumul_off_2c(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) )
         
-        
-    residuals_JDD = np.concatenate((residuals_JDD))
+        i += jdd_sorted.size
 
 
     Dapp_MSD = parms[2] * parms[0] +  (1.0 - parms[2]) * parms[1]
-    residuals_MSD = ( (MSD -  (4*Dapp_MSD*(np.arange(1,len(MSD)+1,1)*delta_t) + 4. * parms[3])) * ((length-1) * n_delta_t)/len(MSD)  * 0.5/np.mean(MSD) )
+    residuals_MSD = ( (MSD -  (4*Dapp_MSD*(np.arange(1,MSD.size+1,1)*delta_t) + 4. * parms[3])) * \
+                     ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
     
-    return np.concatenate((residuals_JDD,residuals_MSD))
+    residuals = np.empty((resid_len_JDD + MSD.size), dtype=np.float64)
+    residuals[:resid_len_JDD] = residuals_JDD
+    residuals[resid_len_JDD:] = residuals_MSD
+        
+    return residuals
