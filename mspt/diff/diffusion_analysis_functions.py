@@ -192,7 +192,7 @@ def fit_msd_jdd_cumul_off_global(parms,JDDs,MSD,length,delta_t,n_delta_t):
         
         
     residuals_MSD = ( (MSD - (4*parms[0]*(np.arange(1,MSD.size+1,1)*delta_t) + 4. * parms[1])) * \
-                     ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
+                     (resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
     
     residuals = np.empty((resid_len_JDD + MSD.size), dtype=np.float64)
     residuals[:resid_len_JDD] = residuals_JDD
@@ -210,14 +210,14 @@ def fit_msd_jdd_cumul_off_global_2c(parms,JDDs,MSD,length,delta_t,n_delta_t):
         jdd_sorted = JDDs[nlag-1]
         
         residuals_JDD[i:i+jdd_sorted.size] = ( ((np.arange(jdd_sorted.size)/(jdd_sorted.size-1) ) -
-                            jdd_cumul_off_2c(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) )
+                            jdd_cumul_off_2c(parms, jdd_sorted, nlag*delta_t)) * float((length/(jdd_sorted.size))) ) # Weight each time lag equally
         
         i += jdd_sorted.size
 
 
     Dapp_MSD = parms[2] * parms[0] +  (1.0 - parms[2]) * parms[1]
     residuals_MSD = ( (MSD -  (4*Dapp_MSD*(np.arange(1,MSD.size+1,1)*delta_t) + 4. * parms[3])) * \
-                     ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
+                     (resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) ) # Weight JDD and MSD fit approx. equally
     
     residuals = np.empty((resid_len_JDD + MSD.size), dtype=np.float64)
     residuals[:resid_len_JDD] = residuals_JDD

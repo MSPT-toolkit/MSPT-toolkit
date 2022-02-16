@@ -28,7 +28,7 @@ def jdd_jac(parms,JDDs,length,delta_t,n_delta_t):
                              jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff * nlag*delta_t)**2)) * \
                              float(((length)/(jdd_sorted.size))) )
             
-        Js_off[i:i+jdd_sorted.size] = (     ((np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff * nlag*delta_t)))) * \
+        Js_off[i:i+jdd_sorted.size] = ( ((np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff * nlag*delta_t)))) * \
                              jdd_sorted**2)/(4.0*(off+Dcoeff * nlag*delta_t)**2)) * \
                              float(((length)/(jdd_sorted.size))) )
     
@@ -66,9 +66,9 @@ def msd_jdd_jac(parms,JDDs,MSD,length,delta_t,n_delta_t):
 
 
     Js_dDcoeff_MSD = ( - 4.0*(np.arange(1,MSD.size+1,1)*delta_t) * \
-                     ( (length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
-    Js_off_MSD = np.array( ([- 4.0 * ((length-1) * n_delta_t)/MSD.size  * \
-                               0.5/np.mean(MSD)] * MSD.size ) )
+                     (resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
+    Js_off_MSD = np.array( ([- 4.0 * (resid_len_JDD - n_delta_t)/MSD.size * \
+                             0.5/np.mean(MSD)] * MSD.size ) )
         
     Js_dDcoeff = np.empty((len(Js_dDcoeff_JDD) + len(Js_dDcoeff_MSD) ))
     Js_off = np.empty((len(Js_off_JDD) + len(Js_off_MSD) ))
@@ -104,20 +104,22 @@ def jdd_jac_2c(parms,JDDs,length,delta_t,n_delta_t):
         jdd_sorted = JDDs[nlag-1]
         
         Js_dDcoeff_1_JDD[i:i+jdd_sorted.size] = ( ((A_1 * np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) * \
-                                   jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2)) * \
-                                   float(((length)/(jdd_sorted.size))) )
+                                                    jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2)) * \
+                                                    float(((length)/(jdd_sorted.size))) )
             
         Js_dDcoeff_2_JDD[i:i+jdd_sorted.size] = ( ((A_2 * np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
-                                   jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
-                                   float(((length)/(jdd_sorted.size))) )
+                                                    jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
+                                                    float(((length)/(jdd_sorted.size))) )
         
-        Js_A_1_JDD[i:i+jdd_sorted.size] = ( np.exp(-(jdd_sorted**2/(4.0* (off + Dcoeff_1 * nlag*delta_t)))) )
+        Js_A_1_JDD[i:i+jdd_sorted.size] = ( np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) - 
+                                            np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) ) * \
+                                            float(((length)/(jdd_sorted.size)))
         
         Js_off_JDD[i:i+jdd_sorted.size] = ( ((A_1* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) * \
-                             jdd_sorted**2)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2) + 
-                            (A_2* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
-                             jdd_sorted**2)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
-                             float(((length)/(jdd_sorted.size))) )
+                                              jdd_sorted**2)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2) + 
+                                             (A_2* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
+                                              jdd_sorted**2)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
+                                              float(((length)/(jdd_sorted.size))) )
 
         i += jdd_sorted.size
 
@@ -128,6 +130,7 @@ def jdd_jac_2c(parms,JDDs,length,delta_t,n_delta_t):
     J[:,2] = Js_A_1_JDD
     J[:,3] = Js_off_JDD
     return J
+
 
 @jit(nopython=True,nogil=False,cache=True)
 def msd_jdd_jac_2c(parms,JDDs,MSD,length,delta_t,n_delta_t):
@@ -149,34 +152,36 @@ def msd_jdd_jac_2c(parms,JDDs,MSD,length,delta_t,n_delta_t):
         jdd_sorted = JDDs[nlag-1]
         
         Js_dDcoeff_1_JDD[i:i+jdd_sorted.size] = ( ((A_1 * np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) * \
-                                   jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2)) * \
-                                   float(((length)/(jdd_sorted.size))) )
+                                                    jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2)) * \
+                                                    float(((length)/(jdd_sorted.size))) )
             
         Js_dDcoeff_2_JDD[i:i+jdd_sorted.size] = ( ((A_2 * np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
-                                   jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
-                                   float(((length)/(jdd_sorted.size))) )
+                                                    jdd_sorted**2 * nlag*delta_t)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
+                                                    float(((length)/(jdd_sorted.size))) )
         
-        Js_A_1_JDD[i:i+jdd_sorted.size] = ( np.exp(-(jdd_sorted**2/(4.0* (off + Dcoeff_1 * nlag*delta_t)))) )
+        Js_A_1_JDD[i:i+jdd_sorted.size] = ( np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) - 
+                                            np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) ) * \
+                                            float(((length)/(jdd_sorted.size)))
         
         Js_off_JDD[i:i+jdd_sorted.size] = ( ((A_1* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_1 * nlag*delta_t)))) * \
-                             jdd_sorted**2)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2) + 
-                            (A_2* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
-                             jdd_sorted**2)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
-                             float(((length)/(jdd_sorted.size))) )
+                                              jdd_sorted**2)/(4.0*(off+Dcoeff_1 * nlag*delta_t)**2) + 
+                                             (A_2* np.exp(-(jdd_sorted**2/(4.0*(off+Dcoeff_2 * nlag*delta_t)))) * \
+                                              jdd_sorted**2)/(4.0*(off+Dcoeff_2 * nlag*delta_t)**2)) * \
+                                              float(((length)/(jdd_sorted.size))) )
 
         i += jdd_sorted.size
 
 
-    Js_dDcoeff_1_MSD = ( - 4.0*A_1*       (np.arange(1,MSD.size+1,1)*delta_t) * \
-                        ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
-    Js_dDcoeff_2_MSD = ( - 4.0*(1.0-A_1)* (np.arange(1,MSD.size+1,1)*delta_t) * \
-                        ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )    
+    Js_dDcoeff_1_MSD = ( - 4.0*A_1*(np.arange(1,MSD.size+1,1)*delta_t) * \
+                       ( resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
+    Js_dDcoeff_2_MSD = ( - 4.0*(1.-A_1)*(np.arange(1,MSD.size+1,1)*delta_t) * \
+                       ( resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
     
     Js_A_1_MSD = ( - 4.0*(Dcoeff_1 - Dcoeff_2)*(np.arange(1,MSD.size+1,1)*delta_t) * \
-                   ((length-1) * n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
+                 ( resid_len_JDD - n_delta_t)/MSD.size  * 0.5/np.mean(MSD) )
     
-    Js_off_MSD = np.array(( [- 4.0 * ((length-1) * n_delta_t)/MSD.size  * \
-                               0.5/np.mean(MSD[1:5])] * MSD.size ))
+    Js_off_MSD = np.array( ([- 4.0 * (resid_len_JDD - n_delta_t)/MSD.size * \
+                             0.5/np.mean(MSD)] * MSD.size ) )
 
         
     Js_dDcoeff_1 = np.empty((resid_len_JDD + MSD.size))
