@@ -59,7 +59,7 @@ def identify_candidates(data,
                         lmax_size=7):
 
     if len(frame_range) == 0:
-        span = range(halfsize, data.shape[0]-halfsize-1, 1)
+        span = range(halfsize, data.shape[0]-halfsize, 1)
     else:
         span = range(frame_range[0], frame_range[1], 1)
 

@@ -11,6 +11,13 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 try:
+    import bottleneck as bn
+    bn_available = True
+except ImportError:
+    bn_available = False
+    print('bottleneck not available or not correctly installed')
+    
+try:
     import torch as th
     if not th.cuda.is_available():
         print('pytorch/CUDA not available or not correctly installed')
@@ -183,50 +190,103 @@ def median_filter_frames(video_chunk, starting_frame_number, full_video, window_
 
 arr_dict = {}
 # Pass shared memory array information to Pool workers
-def pass_shared_arr(shared_memory_array, array_shape):
+def pass_shared_arr(shared_memory_array, array_shape, dtype):
     arr_dict['shared_memory_array'] = shared_memory_array
     arr_dict['array_shape'] = array_shape
-    
-    
-def median_filter_frames_shared_arr(frames, window_half_size):
-    
-    full_video = np.frombuffer(arr_dict['shared_memory_array']).reshape(arr_dict['array_shape'])
-    
-    processed_frames = np.zeros((len(frames), full_video.shape[1], full_video.shape[2]))
-    starting_frame_number = frames[0]
-    
-    for frame_idx, frame in enumerate(frames):
-        if frame >= window_half_size and frame < full_video.shape[0] - window_half_size - 1:
-            processed_frames[frame_idx,:,:] = ( full_video[frame,:,:] / 
-                                                np.median(full_video[frame-window_half_size:frame+window_half_size+1,:,:], axis=0) - 1.0 )
+    arr_dict['dtype'] = dtype
+
+
+if bn_available == True:
+    # Use move median function implemented in bottleneck
+    def moving_median_filter(frames, window_half_size, full_video):
+        
+        if full_video is None:
+            full_video = np.frombuffer(arr_dict['shared_memory_array'],
+                                       dtype=arr_dict['dtype']).reshape(arr_dict['array_shape'])
+        
+        window_size = window_half_size * 2 + 1
+        starting_frame_number = frames[0]
+        
+        # Specify frames for bottlenecks moving median as it is not using a centered moving window
+        frames_move_median = np.arange(frames[0] - window_half_size,
+                                       frames[-1] + window_half_size +1,
+                                       1)
+        frames_move_median = np.where(frames_move_median>=full_video.shape[0],
+                                      frames_move_median-full_video.shape[0],
+                                      frames_move_median)
+        
+        array_move_median = full_video[frames_move_median]
             
-    return starting_frame_number, processed_frames
+        processed_frames = ( full_video[frames,:,:] / 
+                             bn.move_median(array_move_median, window_size, axis=0)[window_size-1:] - 1)
+        # Set leading #window_half_size frames to NaNs as no median of length `window_size` can be calculated
+        if np.any(frames_move_median<0):
+            processed_frames[:np.sum(frames_move_median<0)] = np.nan
+        # Set trailing #window_half_size frames to NaNs as no median of length `window_size` can be calculated
+        if (frames[-1] + window_half_size +1)>full_video.shape[0]:
+            processed_frames[(full_video.shape[0]) - (frames[-1] + window_half_size +1):] = np.nan
+        
+        return starting_frame_number, processed_frames
+    
+else:
+    # Use custom numpy function if bottleneck is not installed
+    def moving_median_filter(frames, window_half_size, full_video):
+        
+        if full_video is None:
+            full_video = np.frombuffer(arr_dict['shared_memory_array'],
+                                       dtype=arr_dict['dtype']).reshape(arr_dict['array_shape'])
+        
+        processed_frames = np.full((len(frames), full_video.shape[1], full_video.shape[2]),np.nan,dtype=np.float64)
+        starting_frame_number = frames[0]
+        
+        for frame_idx, frame in enumerate(frames):
+            if frame >= window_half_size and frame < full_video.shape[0] - window_half_size:
+                processed_frames[frame_idx,:,:] = ( full_video[frame,:,:] / 
+                                                    np.median(full_video[frame-window_half_size:frame+window_half_size+1,:,:], axis=0) - 1.0 )
+                
+        return starting_frame_number, processed_frames
 
 
-def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode = 'mean', parallel = 0, GPU = 0):
+def continuous_bg_remover(raw_frames, navg=1, window_half_size=5, mode = 'mean', parallel = 0, GPU = 0):
     # mode 'mean': continuous background removal as used for mass photometry. Generates mean images of window_half_size frames before (mean_before) and after (mean_after) the central frame and generates the new frame by calculating mean_after/mean_before.
     #mode 'median': continuous background removal using a sliding median window. Generates a median image starting at window_half_size frames before and ending window_half_size frames after the central frame and divides the central frame by this median image.
     
     assert mode == 'mean' or mode == 'median', 'continuous_bg_mode not recognised, choose between mean or median'
     
-    av_frames = frame_averager(raw_frame_sequence, navg=navg)
-    
+
+    if navg == 1:
+        av_frames = raw_frames.astype(np.int32) # Convert to int32 as int16 is not supported by bottleneck
+        dtype = np.int32
+        typecode = 'l'
+    else:
+        av_frames = frame_averager(raw_frames, navg=navg) # Result is float64
+        dtype = np.float64
+        typecode = 'd'
+        
     if mode == 'mean':
         
-        processed_frames = np.zeros_like(av_frames)
+            
+        processed_frames = np.full(av_frames.shape,np.nan,dtype=np.float64)
         for frame_number, frame in enumerate(tqdm(av_frames, desc='Generating frames...', unit='frames')):
-            if frame_number > window_half_size and frame_number < len(av_frames)-window_half_size-1:
-                processed_frames[frame_number] = np.mean(av_frames[frame_number+1:frame_number+window_half_size+1], axis=0)/np.mean(av_frames[frame_number-window_half_size-1:frame_number], axis=0)-1.
-    
+            if frame_number > window_half_size and frame_number < len(av_frames)-window_half_size:
+                processed_frames[frame_number] = np.mean(av_frames[frame_number+1:frame_number+window_half_size+1], axis=0)/np.mean(av_frames[frame_number-window_half_size:frame_number], axis=0)-1.
+
+            
     elif mode == 'median':
         
         if parallel == 0 and GPU == 0:
-            processed_frames = np.zeros_like(av_frames)
-            for frame_number, frame in enumerate(tqdm(av_frames, desc='Generating frames...', unit='frames')):
-                if frame_number >= window_half_size and frame_number < len(av_frames)-window_half_size-1:
-                    processed_frames[frame_number] = frame/np.median(av_frames[frame_number-window_half_size:frame_number+window_half_size+1], axis=0)-1.0
+            processed_frames = np.full(av_frames.shape,np.nan,dtype=np.float64)
+            number_of_chunks = 100
+            frames_split = np.array_split(np.arange(av_frames.shape[0]), number_of_chunks)
+            with tqdm(total=av_frames.shape[0], desc='Generating frames...', unit='frames') as pbar:
+                
+                for chunk in frames_split:
+                    starting_frame, processed_chunk = moving_median_filter(chunk, window_half_size,av_frames)
+                    processed_frames[starting_frame:starting_frame+chunk.size,:,:] = processed_chunk
+                    pbar.update(chunk.size)
+                    
         
-        if parallel == 0 and GPU == 1:
+        elif parallel == 0 and GPU == 1:
             cuda0 = th.device('cuda:0')
             processed_frames = np.zeros_like(av_frames)
             pbar = tqdm(total=len(processed_frames), desc='Generating frames...', unit='frames')
@@ -235,7 +295,7 @@ def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode =
             processed_frames = th.from_numpy(processed_frames).to(cuda0)
             
             for frame_number, frame in enumerate(av_frames):
-                if frame_number >= window_half_size and frame_number < len(av_frames)-window_half_size-1:
+                if frame_number >= window_half_size and frame_number < len(av_frames)-window_half_size:
                     processed_frames[frame_number] = th.div(frame, th.median(av_frames[frame_number-window_half_size:frame_number+window_half_size+1], dim=0).values)-1.0
                 pbar.update(1)
             
@@ -245,29 +305,30 @@ def continuous_bg_remover(raw_frame_sequence, navg=1, window_half_size=5, mode =
             th.cuda.empty_cache()
         
         elif parallel == 1 and GPU == 0:
-            
-            useful_chunk_size = av_frames.shape[0] // ((mp.cpu_count()-1)*10)
-            number_of_chunks = av_frames.shape[0] // useful_chunk_size
+            # useful_chunk_size = av_frames.shape[0] // ((mp.cpu_count()-1)*10)
+            # number_of_chunks = av_frames.shape[0] // useful_chunk_size
+            number_of_chunks = 100
             
             frames_split = np.array_split(np.arange(av_frames.shape[0]), number_of_chunks)
             
             # Get dimensions of movie data
             movie_shape = av_frames.shape
             # Create shared memomy array
-            shared_arr = mp.RawArray('d', movie_shape[0] * movie_shape[1] * movie_shape[2])
-            shared_arr_np = np.frombuffer(shared_arr, dtype=np.float64).reshape(movie_shape)
+            shared_arr = mp.RawArray(typecode, movie_shape[0] * movie_shape[1] * movie_shape[2])
+            shared_arr_np = np.frombuffer(shared_arr, dtype=dtype).reshape(movie_shape)
             # Copy movie data to shared array.
             np.copyto(shared_arr_np, av_frames)
             
             
             with tqdm(total=av_frames.shape[0], desc='Generating frames...', unit='frames') as pbar:
                 
-                with mp.Pool(processes=(mp.cpu_count()-1), initializer=pass_shared_arr, initargs=(shared_arr, movie_shape)) as pool:
+                with mp.Pool(processes=(mp.cpu_count()-1), initializer=pass_shared_arr, initargs=(shared_arr, movie_shape, dtype)) as pool:
             
-                    result_objects = [pool.apply_async(median_filter_frames_shared_arr,
+                    result_objects = [pool.apply_async(moving_median_filter,
                                                        args=(chunk,
-                                                             window_half_size),
-                                                             callback=lambda _: pbar.update(chunk.shape[0])) for chunk in frames_split]
+                                                             window_half_size,
+                                                             None),
+                                                             callback=lambda _: pbar.update(chunk.size)) for chunk in frames_split]
                     
                     processed_movie_list = list()
                     for i in range(len(result_objects)):
@@ -352,9 +413,14 @@ def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range
     
     if mode == 'raw':
         
-        av_frames = frame_averager(raw_frames, navg=navg)
+        if navg == 1:
+
+            return raw_frames, filename
         
-        return av_frames, filename
+        else:
+            av_frames = frame_averager(raw_frames, navg=navg)
+            
+            return av_frames, filename
     
     elif mode == 'continuous_mean':
         
