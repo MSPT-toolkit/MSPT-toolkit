@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Steiert"
+  given-names: "Frederik"
+  orcid: "https://orcid.org/0000-0001-5871-8064"
+- family-names: "Hundt"
+  given-names: "Nikolas"
+  orcid: "https://orcid.org/0000-0001-8217-671X"
+title: "MSPT-toolkit"
+url: "https://github.com/MSPT-toolkit/MSPT-toolkit"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Steiert"
+    given-names: "Frederik"
+    orcid: "https://orcid.org/0000-0001-5871-8064"
+  - family-names: "Heermann"
+    given-names: "Tamara"
+    orcid: "https://orcid.org/0000-0003-1607-0727"
+  - family-names: "Hundt"
+    given-names: "Nikolas"
+    orcid: "https://orcid.org/0000-0001-8217-671X"
+  - family-names: "Schwille"
+    given-names: "Petra"
+    orcid: "https://orcid.org/0000-0002-6106-4847"
+  doi: "10.3791/63583"
+  url: "https://www.jove.com/t/63583"
+  journal: "Journal of Visualized Experiments"
+  title: "Mass-Sensitive Particle Tracking to Characterize Membrane-Associated Macromolecule Dynamics"
+  issue: "180"
+  year: "2022"
