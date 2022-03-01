@@ -10,6 +10,16 @@
 - [x] Visualizing the correlation of molecular mass and diffusion coefficient of single particles
 - [x] Fast batch-mode processing
 
+<br/>
+
+<div align="center">
+  <img src="https://user-images.githubusercontent.com/80796346/156175815-16fd5b1a-b6b8-402f-92c9-ce98f8e5f645.png" width="50%" align="center" alt="Workflow diagram">
+</div>
+
+<div align="center">
+  <b>Data analysis workflow</b>. Reprinted from <a href="https://dx.doi.org/10.3791/63583">Steiert et al.</a>, <em>J. Vis. Exp.</em> (2022).
+</div>
+
 
 #### A detailed protocol describing the experimental and data analysis workflow can be found here:
 * [`Mass-Sensitive Particle Tracking to Characterize Membrane-Associated Macromolecule Dynamics`](https://dx.doi.org/10.3791/63583) <br/> _Journal of Visualized Experiments_ (2022).
