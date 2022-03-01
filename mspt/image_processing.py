@@ -38,7 +38,7 @@ def load_mp(homedir = "D:"):
     mpfile = h5py.File(filename, 'r')
     frames = np.asarray(mpfile['frame'])
     
-    print('Loaded %s' %filename)
+    print('Loaded {}'.format(filename))
     
     return frames, filename
 
@@ -46,7 +46,7 @@ def load_mp_nodialog(filename):
     mpfile = h5py.File(filename, 'r')
     frames = np.asarray(mpfile['frame'])
     
-    print('Loaded %s' %filename)
+    print('Loaded {}'.format(filename))
     
     return frames, filename
 
@@ -87,6 +87,7 @@ def fileDialog(initialdir=None):
     path = filedialog.askopenfilename(initialdir=enterdir, multiple=False)
     _fileDialogLastDir = os.path.dirname(path)
     #get_ipython().run_line_magic("gui", "tk")
+    print('Loaded {}'.format(path))
     return path
 
 
@@ -183,7 +184,7 @@ def frame_averager(input_frame_sequence, navg=1):
 def median_filter_frames(video_chunk, starting_frame_number, full_video, window_half_size):
     processed_frames = np.zeros_like(video_chunk)
     for frame_number, frame in enumerate(video_chunk):
-        if frame_number+starting_frame_number >= window_half_size and frame_number+starting_frame_number < len(full_video)-window_half_size-1:
+        if frame_number+starting_frame_number >= window_half_size and frame_number+starting_frame_number < len(full_video)-window_half_size:
             processed_frames[frame_number] = frame/np.median(full_video[frame_number+starting_frame_number-window_half_size:frame_number+starting_frame_number+window_half_size+1], axis=0)-1.0
     return processed_frames
 
@@ -307,7 +308,7 @@ def continuous_bg_remover(raw_frames, navg=1, window_half_size=5, mode = 'mean',
         elif parallel == 1 and GPU == 0:
             # useful_chunk_size = av_frames.shape[0] // ((mp.cpu_count()-1)*10)
             # number_of_chunks = av_frames.shape[0] // useful_chunk_size
-            number_of_chunks = 100
+            number_of_chunks = (mp.cpu_count()-1)*10
             
             frames_split = np.array_split(np.arange(av_frames.shape[0]), number_of_chunks)
             
