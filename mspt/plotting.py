@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from fastkde import fastKDE
+from IPython.display import clear_output
 
 def generate_2D_KDE(data,
                 x='median_mass',
@@ -130,10 +131,27 @@ def generate_2D_KDE(data,
     if traj_length:
         dat = dat[dat['len'] >= traj_length]
 
-    # dat = dat[dat['median_mass']<=600.0]
+    # Filter out results with a negative median mass
     dat = dat[dat['median_mass']>=0]
+
+    # Filter out unsuccessful fits
+    if y == 'D_JDD':
+        dat = dat[dat['fit_JDD_success']==1]
+    elif y == 'Deff_JDD_2c':
+        dat = dat[dat['fit_JDD_2c_success']==1]
+    elif y == 'Deff_JDD':
+        dat = dat[(dat['fit_JDD_success']==1) | (dat['fit_JDD_2c_success']==1)]
+    elif y == 'D_MSD_JDD':
+        dat = dat[dat['fit_MSD_JDD_1c_success']==1]
+    elif y == 'Deff_MSD_JDD_2c':
+        dat = dat[dat['fit_MSD_JDD_2c_success']==1]
+    elif y == 'Deff_MSD_JDD':
+        dat = dat[(dat['fit_MSD_JDD_1c_success']==1) | (dat['fit_MSD_JDD_2c_success']==1)]
     
-    # Filter out very slow particles.
+    # Filter out NaNs in y variable originating from non-physical fit results
+    dat = dat[~dat[y].isna()]
+    
+    # Filter out very slow particles (and negative diffusion coeffs)
     dat = dat[dat[y]>0.0001]
     
     # Filter out particles where first 3 mean squared displacements are not
@@ -150,6 +168,7 @@ def generate_2D_KDE(data,
     num_y = (Dmax-Dmin)/512. * numPoints
 
     # 2D KDE
+    print('Calculating KDE...')
     myPDF,axes = fastKDE.pdf(dat[x].values, 
                              np.log10(dat[y].values), # calculate diffusion KDE in log-space
                              axes=[np.linspace(mass_center-num_x/2., mass_center+num_x/2.,numPoints),
@@ -172,7 +191,7 @@ def generate_2D_KDE(data,
     #                              doApproximateECF=True,
     #                              ecfPrecision=2,
     #                              logAxes=False)
-
+    clear_output(wait=True)
     v1,v2 = axes
     
     df_kde = pd.DataFrame(myPDF,index=v2,columns=v1)
@@ -180,8 +199,8 @@ def generate_2D_KDE(data,
     df_kde = df_kde.loc[df_kde.index[df_kde.index>=Dmin], df_kde.columns[df_kde.columns>=mmin]]
     df_kde = df_kde.loc[df_kde.index[df_kde.index<=Dmax], df_kde.columns[df_kde.columns<=mmax]]
     
-    axs1.set_title('n = {} trajectories'.format(str(dat.shape[0])))
-    print('n = {}, \
+    axs1.set_title('n = {}'.format(str(dat.shape[0])))
+    print('n = {} trajectories, \
           shape of KDE: {}, \
           relative sum of KDE within plotting frame: {}'.format(str(dat.shape[0]),
                                                                 str(df_kde.shape),
@@ -218,7 +237,7 @@ def generate_2D_KDE(data,
     line_colors[:,:-1] = [0,0,0]
     line_colors[:,-1] = np.linspace(0,1,n_levels)
 
-    
+    # Plot marginal distributions
     axs1.plot(df_kde.columns,
               df_kde.sum(axis=0)*np.mean(np.diff(df_kde.index.values)),
               color=colors[-1,:],

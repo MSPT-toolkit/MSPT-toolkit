@@ -73,7 +73,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         
         ### JDD fit: 1 component #############
         jdd_1c_flag = False
-        bounds_x0_1c = ([0.00001, -np.inf], [np.inf, np.inf])
+
         try: 
             res_lsq_jdd = least_squares(fit_jdd_cumul_off,
                                         np.array([1.0,0.005]),
@@ -102,7 +102,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         
         ### JDD fit: 2 components ############
         jdd_2c_flag = False
-        bounds_x0_2c = ([0.00001, 0.00001, 0.0,-np.inf],[np.inf, np.inf, 1.0,np.inf])
+
         try: 
             res_lsq_jdd_2c = least_squares(fit_jdd_cumul_off_2c,
                                            np.array([0.1,1.0,0.5,0.005]),
@@ -137,7 +137,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
 
         ### Global fit MSD & JDD: 1 component
         msd_jdd_1c_flag = False  
-        bounds_x0_1c = ([0.00001, -np.inf],[np.inf, np.inf])
+
         try:
             res_lsq_msd_jdd_1c = least_squares(fit_msd_jdd_cumul_off_global,
                                                np.array([1.0,0.004]),
@@ -171,7 +171,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
         
         ### Global fit MSD & JDD: 2 components
         msd_jdd_2c_flag = False
-        bounds_x0_2c = ([0.00001, 0.00001, 0.0,-np.inf],[np.inf, np.inf, 1.0,np.inf])
+
         try:
             res_lsq_msd_jdd_2c = least_squares(fit_msd_jdd_cumul_off_global_2c,
                                                np.array([0.1,1.0,0.5,0.004]),
@@ -222,7 +222,7 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
             tmp_array[6] = 0                                    # Reduced chi squared = 0, exact solution (line through 2 datapoints)
         else:
             tmp_array[6] = res_lsq_msd[2]/(res_lsq_msd[3] - 2.) # Reduced chi squared
-        tmp_array[7] = MSD_check                                # True if first 2 MSD data points are monotonously increasing
+        tmp_array[7] = MSD_check                                # True if first 3 MSD data points are monotonously increasing
         ########################################################################################################################################
         
         ### JDD fit: 1 component ###############################################################################################################
@@ -275,47 +275,66 @@ def fit_JDD_MSD(trajectory_id, trajs_df, frame_rate=199.8, pixel_size=84.4, n_ti
                                         columns=['len','center frame', 'med_c','mean_c',
                                                  'D_MSD','off_MSD', 'chi_MSD' ,'MSD_check', 
                                                  'D_JDD', 'off_JDD', 'chi_JDD', 'fit_JDD_success', 'flag_JDD_c1',
-                                                 '2c_JDD_D_1', '2c_JDD_D_2', '2c_JDD_A_1', '2c_JDD_A_2', '2c_JDD_off', '2c_JDD_chi', 'fit_JDD_2c_success', 'flag_JDD_c2',
-                                                 'D_MSD_JDD','off_MSD_JDD', 'chi_MSD_JDD','fit_MSD_JDD_1c_success', 'flag_MSD_JDD_c1',
-                                                 'D_1_MSD_JDD_c2','D_2_MSD_JDD_c2','A_1_MSD_JDD_c2','A_2_MSD_JDD_c2', 'off_MSD_JDD_c2', 'chi_MSD_JDD_c2' , 'fit_MSD_JDD_2c_success', 'flag_MSD_JDD_c2'])
+                                                 'D_1_JDD_2c', 'D_2_JDD_2c', 'A_1_JDD_2c', 'A_2_JDD_2c', 'off_JDD_2c', 'chi_JDD_2c', 'fit_JDD_2c_success', 'flag_JDD_2c',
+                                                 'D_MSD_JDD','off_MSD_JDD', 'chi_MSD_JDD','fit_MSD_JDD_1c_success', 'flag_MSD_JDD_1c',
+                                                 'D_1_MSD_JDD_2c','D_2_MSD_JDD_2c','A_1_MSD_JDD_2c','A_2_MSD_JDD_2c', 'off_MSD_JDD_2c', 'chi_MSD_JDD_2c' , 'fit_MSD_JDD_2c_success', 'flag_MSD_JDD_2c'])
     
     dtypes = {'len': np.uint32,
               'MSD_check': np.bool_,
               'fit_JDD_success': np.bool_,
               'flag_JDD_c1': np.bool_,
               'fit_JDD_2c_success': np.bool_,
-              'flag_JDD_c2': np.bool_,
+              'flag_JDD_2c': np.bool_,
               'fit_MSD_JDD_1c_success': np.bool_,
-              'flag_MSD_JDD_c1': np.bool_,
+              'flag_MSD_JDD_1c': np.bool_,
               'fit_MSD_JDD_2c_success': np.bool_,
-              'flag_MSD_JDD_c2': np.bool_}
+              'flag_MSD_JDD_2c': np.bool_}
     
     df_jdd_msd = df_jdd_msd.astype(dtypes)
 
-    # Calculate effective diffusion coefficient from 1 and 2 component JDD
-    # analysis based on chi squared criteria
-    df_jdd_msd['Deff_JDD_2c'] = ( df_jdd_msd['2c_JDD_A_1'] * df_jdd_msd['2c_JDD_D_1'] +
-                                  df_jdd_msd['2c_JDD_A_2'] * df_jdd_msd['2c_JDD_D_2'] )
+    # Calculate effective diffusion coefficient for 2 component JDD
+    df_jdd_msd['Deff_JDD_2c'] = np.where( ( (df_jdd_msd['fit_JDD_2c_success']==True) & 
+                                            (df_jdd_msd['D_1_JDD_2c']>0) & 
+                                            (df_jdd_msd['D_2_JDD_2c']>0) & 
+                                            (df_jdd_msd['A_1_JDD_2c'].between(0,1)) ),
+                                         
+                                            (df_jdd_msd['A_1_JDD_2c'] * df_jdd_msd['D_1_JDD_2c'] +
+                                             df_jdd_msd['A_2_JDD_2c'] * df_jdd_msd['D_2_JDD_2c'] ),
+                                            
+                                             np.nan )
     
-    df_jdd_msd['Deff_JDD'] = np.where(df_jdd_msd['chi_JDD']<=df_jdd_msd['2c_JDD_chi'],
-                                      df_jdd_msd['D_JDD'],
-                                      df_jdd_msd['Deff_JDD_2c'])
+    # Select 1 or 2 component JDD fit based on reduced chi squared criteria
+    # In case of non-physical fit results, choose 1 component JDD
+    df_jdd_msd['Deff_JDD'] = np.where( ( (df_jdd_msd['chi_JDD_2c']<df_jdd_msd['chi_JDD']) &
+                                         (~df_jdd_msd['Deff_JDD_2c'].isna()) ),
+                                          df_jdd_msd['Deff_JDD_2c'],
+                                          df_jdd_msd['D_JDD'])
+
+    # Calculate effective diffusion coefficient for 2 component global MSD and JDD fit
+    df_jdd_msd['Deff_MSD_JDD_2c'] = np.where( ( (df_jdd_msd['fit_MSD_JDD_2c_success']==True) & 
+                                                (df_jdd_msd['D_1_MSD_JDD_2c']>0) & 
+                                                (df_jdd_msd['D_2_MSD_JDD_2c']>0) & 
+                                                (df_jdd_msd['A_1_MSD_JDD_2c'].between(0,1)) ),
+                                             
+                                                (df_jdd_msd['A_1_MSD_JDD_2c'] * df_jdd_msd['D_1_MSD_JDD_2c'] + 
+                                                 df_jdd_msd['A_2_MSD_JDD_2c'] * df_jdd_msd['D_2_MSD_JDD_2c'] ),
+                                                
+                                                 np.nan)
     
-    # Calculate effective diffusion coefficient from global MSD and JDD
-    # analysis based on chi squared criteria
-    df_jdd_msd['Deff_MSD_JDD_2c'] = ( df_jdd_msd['A_1_MSD_JDD_c2'] * df_jdd_msd['D_1_MSD_JDD_c2'] + 
-                                      df_jdd_msd['A_2_MSD_JDD_c2'] * df_jdd_msd['D_2_MSD_JDD_c2'] )
-    
-    df_jdd_msd['Deff_MSD_JDD'] = np.where(df_jdd_msd['chi_MSD_JDD']<=df_jdd_msd['chi_MSD_JDD_c2'],
-                                          df_jdd_msd['D_MSD_JDD'],
-                                          df_jdd_msd['Deff_MSD_JDD_2c'])
+    # Select 1 or 2 component global MSD and JDD fit based on reduced chi squared criteria
+    # In case of non-physical fit results, choose 1 component JDD
+    df_jdd_msd['Deff_MSD_JDD'] = np.where( ( (df_jdd_msd['chi_MSD_JDD_2c']<df_jdd_msd['chi_MSD_JDD']) &
+                                             (~df_jdd_msd['Deff_MSD_JDD_2c'].isna()) ),
+                                              df_jdd_msd['Deff_MSD_JDD_2c'],
+                                              df_jdd_msd['D_MSD_JDD'])
         
-    
+    # Create DataFrame containing the whole trajectory information (list of x positions, y positions, and contrasts) in three columns
     traj_df_temp = pd.DataFrame.from_dict(dict_traj,
                                           orient='index',
                                           columns=['x pos','y pos','contrast'])
-    
+    # Set dtype to object as multiple values are contained in each cell
     traj_df_temp = traj_df_temp.astype(object)
+    # Merge DataFrames horizontally
     df_jdd_msd = pd.concat([df_jdd_msd, traj_df_temp], axis=1)
 
     return df_jdd_msd
