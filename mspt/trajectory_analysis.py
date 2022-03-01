@@ -139,7 +139,9 @@ def fit_trajectories(list_of_csv,
         
                 particle_id = traj_data['particle'].unique()
             
-                number_of_chunks = 100
+                # useful_chunk_size = particle_id .shape[0] // ((mp.cpu_count()-1)*10)
+                # number_of_chunks = particle_id .shape[0] // useful_chunk_size
+                number_of_chunks = (mp.cpu_count()-1)*10
                 
                 particle_ids_split = np.array_split(particle_id, number_of_chunks)
             

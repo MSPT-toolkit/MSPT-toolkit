@@ -144,7 +144,7 @@ def particle_fitter(movie,
 
     # useful_chunk_size = cands.shape[0] // (processes*10)
     # number_of_chunks = cands.shape[0] // useful_chunk_size
-    number_of_chunks = 100
+    number_of_chunks = processes*10
     
     cands_split = np.array_split(cands, number_of_chunks)
     

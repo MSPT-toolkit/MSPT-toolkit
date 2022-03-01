@@ -65,7 +65,7 @@ def identify_candidates(data,
 
     # useful_chunk_size = len(span) // (processes*10)
     # number_of_chunks = len(span) // useful_chunk_size
-    number_of_chunks = 100
+    number_of_chunks = processes*10
     frames_split = np.array_split(span, number_of_chunks)
 
     with tqdm(total=len(span), desc='Identifying particle candidates...', unit='frames') as pbar:
