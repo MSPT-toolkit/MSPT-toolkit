@@ -9,7 +9,7 @@ import numpy as np
 from numba import jit
 
 
-@jit(nopython=True, fastmath=True, nogil=False, parallel=False)
+@jit(nopython=True, fastmath=True, nogil=False, parallel=False, cache=True)
 def fit_peak_DoG_mle_hessian(parms, X, Y, im, s_fixed=True):
     A=parms[0]
     dx=parms[1]

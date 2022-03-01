@@ -10,25 +10,25 @@ import mspt.loc.radialcenter as radialcenter
 
 
 
-@jit(nopython=True, nogil=False, parallel=False)
+@jit(nopython=True, nogil=False, parallel=False, cache=True)
 def difference_of_gaussians(A, delta_x, delta_y, T, s, offset, sx, sy ):
     DoG = A*(np.exp(-((delta_x)**2/(2*(sx**2))+(delta_y)**2/(2*(sy**2))))-((1-T)/s)*np.exp(-((delta_x)**2/(2*((s*sx)**2))+(delta_y)**2/(2*((s*sy)**2)))))+offset
 
     return DoG
 
-@jit(nopython=True,  nogil=False, parallel=False)
+@jit(nopython=True,  nogil=False, parallel=False, cache=True)
 def difference_of_gaussians_im(amp, dx, dy, T, s, offset, sx, sy, X, Y):
     return difference_of_gaussians(amp,
     delta_x=(X - dx), delta_y=(Y - dy), T=T, s=s, offset=offset, sx=sx, sy=sy)
 
 
 
-@jit(nopython=True, nogil=False, parallel=False)
+@jit(nopython=True, nogil=False, parallel=False, cache=True)
 def _norm_logpdf(x):
     return -x**2 / 2.0 - np.log(np.sqrt(2*np.pi))
 
 
-@jit(nopython=True, nogil=False, parallel=False)
+@jit(nopython=True, nogil=False, parallel=False, cache=True)
 def err_nll(parms, X, Y, im):
     return np.sum(- _norm_logpdf( (difference_of_gaussians_im(parms[0], # amp
                                                               parms[1], # dx
