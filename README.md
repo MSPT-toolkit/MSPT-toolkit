@@ -30,6 +30,9 @@
 
 ##
 ### Installation remarks
+
+If you are new to Python, installing the [`Anaconda Distribution`](https://www.anaconda.com/products/distribution) is highly recommended.
+
 #### Required packages
 
 <ul>
@@ -41,7 +44,7 @@
   <b>fastkde</b>
   <br>To compare the distributions of molecular mass and diffusion coefficient, two-dimensional kernel density estimations are generated using [`fastKDE`](https://github.com/LBL-EESA/fastkde). For installation instructions, click [`here`](https://github.com/LBL-EESA/fastkde#how-do-i-get-set-up).
 
-   <b>bottleneck</b> (optional, included in Anaconda)
+   <b>bottleneck</b> (optional but recommended, included in Anaconda)
   <br> The package [`bottleneck`](https://bottleneck.readthedocs.io/en/latest/) speeds up the rolling median-based background removal on CPUs more than 10-fold.
   For installation instructions, click [`here`](https://bottleneck.readthedocs.io/en/latest/installing.html).
   
@@ -52,4 +55,11 @@
 ##
 ### Usage
 
-The data analysis workflow is integrated in the Jupyter notebook `MSPT analysis.ipynb` which contains descriptions about the expected input and output of each step as well as  required parameters. In the complementary notebook  `Movie visualization.ipynb`, raw or processed movies can be inspected interactively, for example to examine the membrane crowdedness or the effect of different threshold settings on particle detection.
+The data analysis workflow is integrated in the Jupyter notebook `MSPT analysis.ipynb` which contains descriptions about the expected input and output of each step as well as required parameters. In the complementary notebook  `Movie visualization.ipynb`, raw or processed movies can be inspected interactively, for example to examine the membrane crowdedness or the effect of different threshold settings on particle detection.
+
+##
+### ❗ Important note
+
+File compression needs to be turned off in the acquisition software before movies are saved to disk. Instructions on how to turn off file compression can be found in the manufacturer's user manual of the acquisition software.
+<br/>
+If movie recordings were saved with compression and you want to recover them, please get it touch with Refeyn for a decompression module.
