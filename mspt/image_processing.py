@@ -36,16 +36,36 @@ def load_mp(homedir = "D:"):
     root.withdraw()
     
     mpfile = h5py.File(filename, 'r')
-    frames = np.asarray(mpfile['frame'])
-    
+
+    # Handle different data structures of files acquired with Refeyn OneMP or TwoMP 
+    frames = mpfile.get('frame') # Refeyn OneMP
+    # instrument = mpfile.get('device_info/InstrumentName')[()].decode()
+    if frames == None:
+        frames = mpfile.get('movie/frame') # Refeyn TwoMP
+        # instrument = mpfile.get('movie/device_info/InstrumentName')[()].decode()
+        if frames == None:
+            raise KeyError('Unsupported data structure') # Unknown data structure
+            
+    frames = np.asarray(frames)
+            
     print('Loaded {}'.format(filename))
     
     return frames, filename
 
 def load_mp_nodialog(filename):
     mpfile = h5py.File(filename, 'r')
-    frames = np.asarray(mpfile['frame'])
     
+    # Handle different data structures of files acquired with Refeyn OneMP or TwoMP 
+    frames = mpfile.get('frame') # Refeyn OneMP
+    # instrument = mpfile.get('device_info/InstrumentName')[()].decode()
+    if frames == None:
+        frames = mpfile.get('movie/frame') # Refeyn TwoMP
+        # instrument = mpfile.get('movie/device_info/InstrumentName')[()].decode()
+        if frames == None:
+            raise KeyError('Unsupported data structure') # Unknown data structure
+            
+    frames = np.asarray(frames)
+        
     print('Loaded {}'.format(filename))
     
     return frames, filename
