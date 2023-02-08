@@ -275,14 +275,14 @@ def continuous_bg_remover(raw_frames, navg=1, window_half_size=5, mode = 'mean',
     assert mode == 'mean' or mode == 'median', 'continuous_bg_mode not recognised, choose between mean or median'
     
 
-    if navg == 1:
-        av_frames = raw_frames.astype(np.int32) # Convert to int32 as int16 is not supported by bottleneck
-        dtype = np.int32
-        typecode = 'l'
-    else:
-        av_frames = frame_averager(raw_frames, navg=navg) # Result is float64
-        dtype = np.float64
-        typecode = 'd'
+    #if navg == 1:
+    #    av_frames = raw_frames.astype(np.int32) # Convert to int32 as int16 is not supported by bottleneck
+    #    dtype = np.int32
+    #    typecode = 'l'
+    #else:
+    av_frames = frame_averager(raw_frames, navg=navg) # Result is float64
+    dtype = np.float64
+    typecode = 'd'
         
     if mode == 'mean':
         
