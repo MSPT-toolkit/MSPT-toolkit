@@ -41,12 +41,11 @@ If you are new to Python, installing the [`Anaconda Distribution`](https://www.a
   [`Trackpy`](http://soft-matter.github.io/trackpy/v0.5.0/) is used to link particle detections from consecutive frames into trajectories.
   For installation instructions, click [`here`](http://soft-matter.github.io/trackpy/v0.5.0/installation.html).
 
-  <b>fastkde</b>
-  <br>To compare the distributions of molecular mass and diffusion coefficient, two-dimensional kernel density estimations are generated using [`fastKDE`](https://github.com/LBL-EESA/fastkde). For installation instructions, click [`here`](https://github.com/LBL-EESA/fastkde#how-do-i-get-set-up).
+  <b>fastkde</b> or <b>scikit-learn</b> (for plotting)
+  <br>To compare the distributions of molecular mass and diffusion coefficient, two-dimensional kernel density estimations are generated using [`fastKDE`](https://github.com/LBL-EESA/fastkde). For installation instructions, click [`here`](https://github.com/LBL-EESA/fastkde#how-do-i-get-set-up). Alternatively, [`sklearn.neighbors.KernelDensity`](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KernelDensity.html) could be used.
 
    <b>bottleneck</b> (optional but recommended, included in Anaconda)
-  <br> The package [`bottleneck`](https://bottleneck.readthedocs.io/en/latest/) speeds up the rolling median-based background removal on CPUs more than 10-fold.
-  For installation instructions, click [`here`](https://bottleneck.readthedocs.io/en/latest/installing.html).
+  <br> The package [`bottleneck`](https://bottleneck.readthedocs.io/en/latest/) speeds up the rolling median-based background removal on CPUs more than 10-fold. This option is usually faster than running the background removal on GPU. For installation instructions, click [`here`](https://bottleneck.readthedocs.io/en/latest/installing.html).
   
   <b>CUDA version</b> (optional) 
   <br>To be able to perform image processing on a [`CUDA-capable`](https://developer.nvidia.com/cuda-zone) GPU, [`pytorch`](https://pytorch.org/) is required. Follow the instructions [`here`](https://pytorch.org/get-started/locally/) for details regarding installation.
@@ -62,4 +61,4 @@ The data analysis workflow is integrated in the Jupyter notebook `MSPT analysis.
 
 File compression needs to be turned off in the acquisition software before movies are saved to disk. Instructions on how to turn off file compression can be found in the manufacturer's user manual of the acquisition software.
 <br/>
-If movie recordings were saved with compression and you want to recover them, please get it touch with Refeyn for a decompression module.
+If movie recordings were saved with compression and you want to recover them, please get in touch with Refeyn for a decompression module.
