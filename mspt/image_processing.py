@@ -190,14 +190,21 @@ def frame_averager(input_frame_sequence, navg=1):
     navg = int(navg)
     assert navg > 0, "navg must be a positive integer"
     
-    av_frames = np.mean(input_frame_sequence.reshape(navg,
-                                                     len(input_frame_sequence)//navg,
-                                                     input_frame_sequence.shape[1],
-                                                     input_frame_sequence.shape[2],
-                                                     order='F'),
-                                                     axis=0)
+    if navg == 1: # No frame averaging
+        av_frames = input_frame_sequence.astype(np.int32) # Convert to int32 as int16 dtype of MP files is not supported by bottleneck
+        dtype = np.int32
+        typecode = 'I' # Required to initialize the shared array for multiprocessing
+    else:
+        av_frames = np.mean(input_frame_sequence.reshape(navg,
+                                                         len(input_frame_sequence)//navg,
+                                                         input_frame_sequence.shape[1],
+                                                         input_frame_sequence.shape[2],
+                                                         order='F'),
+                                                         axis=0) # Result is float64
+        dtype = np.float64
+        typecode = 'd' # Required to initialize the shared array for multiprocessing
 
-    return av_frames
+    return av_frames, dtype, typecode
 
 
 
@@ -275,14 +282,8 @@ def continuous_bg_remover(raw_frames, navg=1, window_half_size=5, mode = 'mean',
     assert mode == 'mean' or mode == 'median', 'continuous_bg_mode not recognised, choose between mean or median'
     
 
-    #if navg == 1:
-    #    av_frames = raw_frames.astype(np.int32) # Convert to int32 as int16 is not supported by bottleneck
-    #    dtype = np.int32
-    #    typecode = 'l'
-    #else:
-    av_frames = frame_averager(raw_frames, navg=navg) # Result is float64
-    dtype = np.float64
-    typecode = 'd'
+    av_frames, dtype, typecode = frame_averager(raw_frames, navg=navg) # Result is either int32 (navg=1) or float64 (else)
+
         
     if mode == 'mean':
         
@@ -439,7 +440,7 @@ def mp_reader(batch_mode = False, file_to_load = '', homedir = 'D:', frame_range
             return raw_frames, filename
         
         else:
-            av_frames = frame_averager(raw_frames, navg=navg)
+            av_frames, _, _ = frame_averager(raw_frames, navg=navg)
             
             return av_frames, filename
     
