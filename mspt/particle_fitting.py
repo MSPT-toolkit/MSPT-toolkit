@@ -60,8 +60,8 @@ def frame_fit(img, thresh, method, DoG_estimates,candidate_spots=None):
 
                     if fit_params[8]: # fit successful
                         list_entry = [fit_params[0],        # contrast
-                                      fit_params[1]+pix[0], # x position
-                                      fit_params[2]+pix[1], # y position
+                                      fit_params[2]+pix[0], # x position
+                                      fit_params[1]+pix[1], # y position
                                       fit_params[3],        # T
                                       fit_params[4],        # s
                                       fit_params[5],        # offset
@@ -195,8 +195,8 @@ def fit_candidates(candidate_spots,  method, DoG_estimates):
                 if fit_params[8]: # fit successful
                     list_entry = [frame,
                                   fit_params[0],        # contrast
-                                  fit_params[1]+pix[0], # x position
-                                  fit_params[2]+pix[1], # y position
+                                  fit_params[2]+pix[0], # x position
+                                  fit_params[1]+pix[1], # y position
                                   fit_params[3],        # T
                                   fit_params[4],        # s
                                   fit_params[5],        # offset
