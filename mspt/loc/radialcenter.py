@@ -88,7 +88,8 @@ def radialcenter(I):
     Ninfpix = infpix.sum()
     if Ninfpix > 0:
         if Ninfpix < m.size:
-            m[infpix] = 10 * m[infpix].max()
+            fpix = np.isfinite(m)
+            m[infpix] = 10 * m[fpix].max()
         else:
             unsmoothm = (dIdv + dIdu) / (dIdu - dIdv)
             m = unsmoothm
